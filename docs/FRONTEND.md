@@ -16,7 +16,7 @@ This keeps the first implementation easy to inspect and avoids adding a frontend
 Add Ukraine regions GeoJSON here:
 
 ```text
-uair_raid_analytics/web/static/geo/ukraine_regions.geojson
+server/web/static/geo/ukraine_regions.geojson
 ```
 
 The JavaScript tries to match GeoJSON features by one of these properties:
@@ -28,7 +28,7 @@ The JavaScript tries to match GeoJSON features by one of these properties:
 - `NAME_1`
 - `shapeName`
 
-Best future improvement: normalize the GeoJSON during setup so each feature has `region_id` matching `uair_raid_analytics/regions.py`.
+Best future improvement: normalize the GeoJSON during setup so each feature has `region_id` matching `server/regions.py`.
 
 ## User Flow
 

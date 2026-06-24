@@ -13,7 +13,7 @@ python scripts/update_dataset.py
 If the Vadimkin CSV column names differ from current aliases, update `COLUMN_ALIASES` in:
 
 ```text
-uair_raid_analytics/data/update_dataset.py
+server/data/update_dataset.py
 ```
 
 Do not add sample data unless explicitly requested.
@@ -23,7 +23,7 @@ Do not add sample data unless explicitly requested.
 Add a real Ukraine oblast-level GeoJSON file to:
 
 ```text
-uair_raid_analytics/web/static/geo/ukraine_regions.geojson
+server/web/static/geo/ukraine_regions.geojson
 ```
 
 Normalize feature properties so each region has:
@@ -50,7 +50,7 @@ Future option:
 Create a separate module for validation only:
 
 ```text
-uair_raid_analytics/data/alerts_in_ua_validation.py
+server/data/alerts_in_ua_validation.py
 ```
 
 Token must come from `.env`.

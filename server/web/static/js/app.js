@@ -1,5 +1,6 @@
 const state = {
   summaries: [],
+  summariesByRegionId: new Map(),
   selectedRegionId: null,
   chart: null,
   geoLayer: null,
@@ -48,6 +49,12 @@ function regionName(properties) {
 }
 
 function summaryByFeature(properties) {
+  const id = String(properties.region_id || "").trim();
+  if (id) {
+    const summary = state.summariesByRegionId.get(id);
+    if (summary) return summary;
+  }
+
   const key = regionKey(properties).toLowerCase();
   return state.summaries.find((item) => {
     return (
@@ -101,6 +108,9 @@ async function refreshMapData() {
   const mode = modeSelect.value;
   const response = await fetch(`/api/regions/summary?days=${days}&mode=${mode}`);
   state.summaries = await response.json();
+  state.summariesByRegionId = new Map(
+    state.summaries.map((item) => [String(item.region_id || "").trim(), item]),
+  );
   if (state.geoLayer) {
     state.geoLayer.setStyle(styleFeature);
   }

@@ -3,7 +3,7 @@
 ## Name
 
 - Public name: `UAir-raid-analytics`
-- Python package name: `uair_raid_analytics`
+- Python package name: `server`
 
 ## Product Goal
 

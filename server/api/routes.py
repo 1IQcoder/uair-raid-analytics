@@ -3,14 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from uair_raid_analytics.analytics.metrics import (
+from server.analytics.metrics import (
     VALID_MODES,
     daily_region_stats,
     dataset_meta,
     region_summary,
 )
-from uair_raid_analytics.database import get_session
-from uair_raid_analytics.schemas import DatasetMeta, RegionDailyResponse, RegionSummary
+from server.database import get_session
+from server.schemas import DatasetMeta, RegionDailyResponse, RegionSummary
 
 
 router = APIRouter(prefix="/api", tags=["analytics"])

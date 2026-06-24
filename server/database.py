@@ -5,7 +5,7 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from uair_raid_analytics.config import settings
+from server.config import settings
 
 
 class Base(DeclarativeBase):
@@ -22,7 +22,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 def init_db() -> None:
-    from uair_raid_analytics import models  # noqa: F401
+    from server import models  # noqa: F401
 
     if settings.sqlite_path:
         settings.sqlite_path.parent.mkdir(parents=True, exist_ok=True)

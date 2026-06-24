@@ -11,7 +11,7 @@
 ## Structure
 
 ```text
-uair_raid_analytics/
+server/
   api/          HTTP API routes
   analytics/    runtime aggregation and metrics
   data/         dataset refresh and normalization

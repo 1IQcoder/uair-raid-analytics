@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from uair_raid_analytics.models import AlertEvent, DatasetRefreshLog
-from uair_raid_analytics.regions import REGION_BY_ID, UKRAINE_REGIONS
+from server.models import AlertEvent, DatasetRefreshLog
+from server.regions import REGION_BY_ID, UKRAINE_REGIONS
 
 
 VALID_MODES = {"count", "duration", "combined"}

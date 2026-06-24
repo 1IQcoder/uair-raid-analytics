@@ -21,7 +21,7 @@ source .venv/bin/activate
 pip install -e .
 cp .env.example .env
 python scripts/update_dataset.py
-uvicorn uair_raid_analytics.main:app --reload
+uvicorn server.main:app --reload
 ```
 
 Open the app at `http://127.0.0.1:8000`.
@@ -33,7 +33,7 @@ Open the app at `http://127.0.0.1:8000`.
 - Ukraine regions GeoJSON is not bundled yet. Add it to:
 
 ```text
-uair_raid_analytics/web/static/geo/ukraine_regions.geojson
+server/web/static/geo/ukraine_regions.geojson
 ```
 
 ## Documentation

@@ -9,10 +9,10 @@ import pandas as pd
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from uair_raid_analytics.config import PROJECT_ROOT, settings
-from uair_raid_analytics.database import SessionLocal, init_db
-from uair_raid_analytics.models import AlertEvent, DatasetRefreshLog
-from uair_raid_analytics.regions import normalize_region_name, resolve_region_id
+from server.config import PROJECT_ROOT, settings
+from server.database import SessionLocal, init_db
+from server.models import AlertEvent, DatasetRefreshLog
+from server.regions import normalize_region_name, resolve_region_id
 
 
 COLUMN_ALIASES = {

@@ -47,7 +47,7 @@ raw_location_type
 
 The application is Ukraine-specific.
 
-The current reference list is stored in `uair_raid_analytics/regions.py` and follows Ukrainian regions plus Kyiv, Sevastopol, and Crimea. Future support for districts or communities should extend this reference instead of generalizing the product to other countries.
+The current reference list is stored in `server/regions.py` and follows Ukrainian regions plus Kyiv, Sevastopol, and Crimea. Future support for districts or communities should extend this reference instead of generalizing the product to other countries.
 
 ## alerts.in.ua Role
 

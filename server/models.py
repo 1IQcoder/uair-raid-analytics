@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, Float, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from uair_raid_analytics.database import Base
+from server.database import Base
 
 
 class AlertEvent(Base):
