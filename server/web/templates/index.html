@@ -4,12 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ app_name }}</title>
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIINfQEMfQNLxEibxyf4KfrF5RQr7u+0oHM="
-      crossorigin=""
-    />
     <link rel="stylesheet" href="/static/css/app.css" />
   </head>
   <body>
@@ -39,7 +33,14 @@
             </label>
           </div>
         </header>
-        <div id="map" aria-label="Ukraine alert statistics map"></div>
+        <div id="map" aria-label="Ukraine alert statistics map">
+          <svg
+            id="ukraine-map"
+            role="img"
+            aria-label="Ukraine regions colored by alert statistics"
+            preserveAspectRatio="xMidYMid meet"
+          ></svg>
+        </div>
         <p id="map-status" class="status"></p>
       </section>
 
@@ -63,11 +64,6 @@
       </aside>
     </main>
 
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-      crossorigin=""
-    ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script src="/static/js/app.js"></script>
   </body>

@@ -11,3 +11,4 @@ data/processed/*
 
 data/processed/*.sqlite3
 *.log
+uvicorn.err.log
