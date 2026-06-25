@@ -36,7 +36,7 @@ Open the app at `http://127.0.0.1:8000`.
 server/web/static/geo/ukraine_regions.geojson
 ```
 
-- Regenerate it from the bundled full-resolution geoBoundaries file with:
+- Regenerate it from the bundled full-resolution `ukr_admin1.geojson` file with:
 
 ```bash
 python scripts/normalize_geojson.py

@@ -11,6 +11,8 @@ from server.regions import REGION_BY_ID, UKRAINE_REGIONS
 
 
 VALID_MODES = {"count", "duration", "combined"}
+WAR_START = datetime(2022, 2, 24)
+PERMANENT_ALERT_REGION_IDS = {"16", "29"}
 
 
 def latest_event_timestamp(session: Session) -> datetime | None:
@@ -28,10 +30,49 @@ def analysis_window(session: Session, days: int) -> tuple[datetime | None, datet
     return end - timedelta(days=days), end
 
 
-def _overlap_minutes(started_at: datetime, finished_at: datetime, start: datetime, end: datetime) -> float:
+def _clamped_interval(
+    started_at: datetime,
+    finished_at: datetime,
+    start: datetime,
+    end: datetime,
+) -> tuple[datetime, datetime] | None:
     clamped_start = max(started_at, start)
     clamped_end = min(finished_at, end)
-    return max((clamped_end - clamped_start).total_seconds() / 60, 0)
+    if clamped_end <= clamped_start:
+        return None
+    return clamped_start, clamped_end
+
+
+def _permanent_alert_interval(
+    region_id: str,
+    start: datetime,
+    end: datetime,
+) -> tuple[datetime, datetime] | None:
+    if region_id not in PERMANENT_ALERT_REGION_IDS or end <= WAR_START:
+        return None
+    clamped_start = max(start, WAR_START)
+    if end <= clamped_start:
+        return None
+    return clamped_start, end
+
+
+def _merge_intervals(intervals: list[tuple[datetime, datetime]]) -> list[tuple[datetime, datetime]]:
+    ordered = sorted((start, end) for start, end in intervals if end > start)
+    if not ordered:
+        return []
+
+    merged = [ordered[0]]
+    for start, end in ordered[1:]:
+        current_start, current_end = merged[-1]
+        if start <= current_end:
+            merged[-1] = (current_start, max(current_end, end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def _interval_minutes(intervals: list[tuple[datetime, datetime]]) -> float:
+    return sum((end - start).total_seconds() / 60 for start, end in intervals)
 
 
 def _events_in_window(session: Session, start: datetime, end: datetime) -> list[AlertEvent]:
@@ -64,27 +105,34 @@ def region_summary(session: Session, days: int = 7, mode: str = "combined") -> l
         for region in UKRAINE_REGIONS
     }
 
+    intervals_by_region: dict[str, list[tuple[datetime, datetime]]] = defaultdict(list)
     for event in _events_in_window(session, start, end):
         if not event.region_id:
             continue
+        interval = _clamped_interval(event.started_at, event.finished_at, start, end)
+        if interval:
+            intervals_by_region[event.region_id].append(interval)
+
+    for region_id in PERMANENT_ALERT_REGION_IDS:
+        interval = _permanent_alert_interval(region_id, start, end)
+        if interval:
+            intervals_by_region[region_id].append(interval)
+
+    for region_id, intervals in intervals_by_region.items():
+        merged_intervals = _merge_intervals(intervals)
         bucket = buckets.setdefault(
-            event.region_id,
+            region_id,
             {
-                "region_id": event.region_id,
-                "region_name": event.region_name,
+                "region_id": region_id,
+                "region_name": REGION_BY_ID.get(region_id, {}).get("region_name", region_id),
                 "alert_count": 0,
                 "total_duration_minutes": 0.0,
                 "average_duration_minutes": None,
                 "metric_value": 0.0,
             },
         )
-        bucket["alert_count"] += 1
-        bucket["total_duration_minutes"] += _overlap_minutes(
-            event.started_at,
-            event.finished_at,
-            start,
-            end,
-        )
+        bucket["alert_count"] = len(merged_intervals)
+        bucket["total_duration_minutes"] = _interval_minutes(merged_intervals)
 
     max_count = max((item["alert_count"] for item in buckets.values()), default=0)
     max_duration = max((item["total_duration_minutes"] for item in buckets.values()), default=0)
@@ -118,30 +166,32 @@ def daily_region_stats(session: Session, region_id: str, days: int = 7) -> dict:
         .where(AlertEvent.finished_at > start)
     )
     events = list(session.scalars(stmt))
-    buckets = defaultdict(lambda: {"alert_count": 0, "total_duration_minutes": 0.0})
+    stats = []
+    for offset in range(days):
+        day = start.date() + timedelta(days=offset)
+        day_start = datetime.combine(day, datetime.min.time())
+        day_end = day_start + timedelta(days=1)
+        bucket_start = max(day_start, start)
+        bucket_end = min(day_end, end)
+        intervals = []
 
-    for event in events:
-        bucket_key = event.started_at.date().isoformat()
-        buckets[bucket_key]["alert_count"] += 1
-        buckets[bucket_key]["total_duration_minutes"] += _overlap_minutes(
-            event.started_at,
-            event.finished_at,
-            start,
-            end,
+        for event in events:
+            interval = _clamped_interval(event.started_at, event.finished_at, bucket_start, bucket_end)
+            if interval:
+                intervals.append(interval)
+
+        permanent_interval = _permanent_alert_interval(region_id, bucket_start, bucket_end)
+        if permanent_interval:
+            intervals.append(permanent_interval)
+
+        merged_intervals = _merge_intervals(intervals)
+        stats.append(
+            {
+                "date": day.isoformat(),
+                "alert_count": len(merged_intervals),
+                "total_duration_minutes": _interval_minutes(merged_intervals),
+            }
         )
-
-    stats = [
-        {
-            "date": (start.date() + timedelta(days=offset)).isoformat(),
-            "alert_count": buckets[(start.date() + timedelta(days=offset)).isoformat()][
-                "alert_count"
-            ],
-            "total_duration_minutes": buckets[(start.date() + timedelta(days=offset)).isoformat()][
-                "total_duration_minutes"
-            ],
-        }
-        for offset in range(days)
-    ]
     return {"region_id": region_id, "region_name": region_name, "days": days, "stats": stats}
 
 

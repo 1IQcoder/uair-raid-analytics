@@ -19,7 +19,7 @@ The app reads normalized Ukraine regions GeoJSON here:
 server/web/static/geo/ukraine_regions.geojson
 ```
 
-Generate this stable file from the full-resolution geoBoundaries source:
+Generate this stable file from the full-resolution `ukr_admin1.geojson` source:
 
 ```text
 python scripts/normalize_geojson.py

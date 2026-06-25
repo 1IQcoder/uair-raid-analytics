@@ -26,7 +26,7 @@ The frontend uses a stable normalized file:
 server/web/static/geo/ukraine_regions.geojson
 ```
 
-Regenerate it from the bundled full-resolution geoBoundaries source:
+Regenerate it from the bundled full-resolution `ukr_admin1.geojson` source:
 
 ```bash
 python scripts/normalize_geojson.py

@@ -168,14 +168,14 @@ select {
 
 .region-label {
   fill: var(--region-label);
-  font-size: 17px;
+  font-size: 11.3px;
   font-weight: 400;
   letter-spacing: 0;
   paint-order: stroke;
   pointer-events: none;
   stroke: var(--region-label-stroke);
   stroke-linejoin: round;
-  stroke-width: 4px;
+  stroke-width: 2.7px;
   text-anchor: middle;
   dominant-baseline: central;
   user-select: none;
@@ -394,8 +394,8 @@ dd {
   }
 
   .region-label {
-    font-size: 14px;
-    stroke-width: 3.6px;
+    font-size: 9.3px;
+    stroke-width: 2.4px;
   }
 
   .details {
@@ -453,8 +453,8 @@ dd {
   }
 
   .region-label {
-    font-size: 12px;
-    stroke-width: 3.2px;
+    font-size: 8px;
+    stroke-width: 2.1px;
   }
 
   .chart-header,

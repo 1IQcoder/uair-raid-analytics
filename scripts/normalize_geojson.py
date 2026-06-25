@@ -6,8 +6,38 @@ from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_PATH = PROJECT_ROOT / "server" / "web" / "static" / "geo" / "geoBoundaries-UKR-ADM1.geojson"
+SOURCE_PATH = PROJECT_ROOT / "server" / "web" / "static" / "geo" / "ukr_admin1.geojson"
 OUTPUT_PATH = PROJECT_ROOT / "server" / "web" / "static" / "geo" / "ukraine_regions.geojson"
+
+PCODE_TO_REGION = {
+    "UA01": ("29", "Автономна Республіка Крим"),
+    "UA05": ("4", "Вінницька область"),
+    "UA07": ("8", "Волинська область"),
+    "UA12": ("9", "Дніпропетровська область"),
+    "UA14": ("28", "Донецька область"),
+    "UA18": ("10", "Житомирська область"),
+    "UA21": ("11", "Закарпатська область"),
+    "UA23": ("12", "Запорізька область"),
+    "UA26": ("13", "Івано-Франківська область"),
+    "UA32": ("14", "Київська область"),
+    "UA35": ("15", "Кіровоградська область"),
+    "UA44": ("16", "Луганська область"),
+    "UA46": ("27", "Львівська область"),
+    "UA48": ("17", "Миколаївська область"),
+    "UA51": ("18", "Одеська область"),
+    "UA53": ("19", "Полтавська область"),
+    "UA56": ("5", "Рівненська область"),
+    "UA59": ("20", "Сумська область"),
+    "UA61": ("21", "Тернопільська область"),
+    "UA63": ("22", "Харківська область"),
+    "UA65": ("23", "Херсонська область"),
+    "UA68": ("3", "Хмельницька область"),
+    "UA71": ("24", "Черкаська область"),
+    "UA73": ("26", "Чернівецька область"),
+    "UA74": ("25", "Чернігівська область"),
+    "UA80": ("31", "м. Київ"),
+    "UA85": ("30", "м. Севастополь"),
+}
 
 ISO_TO_REGION = {
     "UA-05": ("4", "Вінницька область"),
@@ -49,16 +79,16 @@ def normalize_properties(geojson: dict[str, Any]) -> None:
     missing: list[str] = []
     for feature in geojson.get("features", []):
         properties = feature.setdefault("properties", {})
-        shape_iso = properties.get("shapeISO")
-        region = ISO_TO_REGION.get(shape_iso)
+        region_code = properties.get("adm1_pcode") or properties.get("shapeISO")
+        region = PCODE_TO_REGION.get(region_code) or ISO_TO_REGION.get(region_code)
         if region is None:
-            missing.append(str(shape_iso))
+            missing.append(str(region_code))
             continue
         properties["region_id"] = region[0]
         properties["region_name"] = region[1]
 
     if missing:
-        raise ValueError(f"Missing shapeISO mappings: {', '.join(sorted(set(missing)))}")
+        raise ValueError(f"Missing region code mappings: {', '.join(sorted(set(missing)))}")
 
 
 def ring_signed_area(ring: list[list[float]]) -> float:
@@ -104,7 +134,8 @@ def rewind_geojson_for_d3(geojson: dict[str, Any]) -> None:
 def validate_geojson(geojson: dict[str, Any]) -> tuple[int, int | None]:
     features = geojson.get("features", [])
     missing_properties = [
-        feature.get("properties", {}).get("shapeISO", "unknown")
+        feature.get("properties", {}).get("adm1_pcode")
+        or feature.get("properties", {}).get("shapeISO", "unknown")
         for feature in features
         if not feature.get("properties", {}).get("region_id")
         or not feature.get("properties", {}).get("region_name")
