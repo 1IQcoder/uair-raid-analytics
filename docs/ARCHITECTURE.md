@@ -6,7 +6,7 @@
 - Data processing: Pandas.
 - Storage: SQLite.
 - ORM: SQLAlchemy.
-- Web shell: Jinja2, Leaflet, Chart.js, vanilla JavaScript.
+- Web shell: Jinja2, d3-geo, inline SVG, vanilla JavaScript.
 
 ## Structure
 
@@ -31,7 +31,7 @@ flowchart TD
   C --> D["SQLite alert_events"]
   D --> E["Runtime analytics"]
   E --> F["FastAPI endpoints"]
-  F --> G["Map and charts"]
+  F --> G["SVG map and HTML charts"]
 ```
 
 ## Precompute Strategy

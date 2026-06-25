@@ -5,30 +5,27 @@
 The MVP frontend is intentionally lightweight:
 
 - server-rendered HTML through Jinja2;
-- Leaflet for the Ukraine map;
-- Chart.js for daily bar charts;
+- d3-geo for the static inline SVG Ukraine map;
+- responsive HTML markup for daily bar charts;
 - vanilla JavaScript for data loading and interactions.
 
 This keeps the first implementation easy to inspect and avoids adding a frontend build system too early.
 
 ## Required Map Asset
 
-Add Ukraine regions GeoJSON here:
+The app reads normalized Ukraine regions GeoJSON here:
 
 ```text
 server/web/static/geo/ukraine_regions.geojson
 ```
 
-The JavaScript tries to match GeoJSON features by one of these properties:
+Generate this stable file from the full-resolution geoBoundaries source:
 
-- `region_id`
-- `id`
-- `uid`
-- `name`
-- `NAME_1`
-- `shapeName`
+```text
+python scripts/normalize_geojson.py
+```
 
-Best future improvement: normalize the GeoJSON during setup so each feature has `region_id` matching `server/regions.py`.
+The JavaScript matches GeoJSON features to API summaries by `region_id`.
 
 ## User Flow
 
@@ -38,4 +35,4 @@ Best future improvement: normalize the GeoJSON during setup so each feature has 
 4. User switches period or mode.
 5. User clicks a region.
 6. App requests `/api/regions/{region_id}/daily`.
-7. Side panel updates metrics and chart.
+7. Detail popup updates metrics and the HTML chart.

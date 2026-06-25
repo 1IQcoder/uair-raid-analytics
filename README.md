@@ -30,10 +30,16 @@ Open the app at `http://127.0.0.1:8000`.
 
 - The repository does not include a sample dataset.
 - The update script downloads CSV data from configured URLs and writes normalized events to SQLite.
-- Ukraine regions GeoJSON is not bundled yet. Add it to:
+- The app reads normalized Ukraine regions GeoJSON from:
 
 ```text
 server/web/static/geo/ukraine_regions.geojson
+```
+
+- Regenerate it from the bundled full-resolution geoBoundaries file with:
+
+```bash
+python scripts/normalize_geojson.py
 ```
 
 ## Documentation

@@ -18,21 +18,18 @@ server/data/update_dataset.py
 
 Do not add sample data unless explicitly requested.
 
-## 2. Add Ukraine Regions GeoJSON
+## 2. Regenerate Ukraine Regions GeoJSON
 
-Add a real Ukraine oblast-level GeoJSON file to:
+The frontend uses a stable normalized file:
 
 ```text
 server/web/static/geo/ukraine_regions.geojson
 ```
 
-Normalize feature properties so each region has:
+Regenerate it from the bundled full-resolution geoBoundaries source:
 
-```json
-{
-  "region_id": "31",
-  "region_name": "м. Київ"
-}
+```bash
+python scripts/normalize_geojson.py
 ```
 
 ## 3. Improve Dataset Refresh

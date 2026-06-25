@@ -1,26 +1,45 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
-const PROJECTION_SCALE = 100;
-const VIEWBOX_PADDING = 12;
+const MAP_PADDING = 8;
+const LABEL_OFFSETS = {
+  14: [0, 28],
+  31: [0, -14],
+};
 
 const state = {
   summaries: [],
   summariesByRegionId: new Map(),
   selectedRegionId: null,
-  chart: null,
   geojson: null,
   svgFeatures: new Map(),
 };
 
+const mapEl = document.querySelector("#map");
 const mapSvg = document.querySelector("#ukraine-map");
 const daysSelect = document.querySelector("#days");
 const modeSelect = document.querySelector("#mode");
+const themeSelect = document.querySelector("#theme");
 const statusEl = document.querySelector("#map-status");
+const detailsPanel = document.querySelector("#region-details");
+const closeDetailsButton = document.querySelector("#details-close");
+const dailyChartEl = document.querySelector("#daily-chart");
 
 daysSelect.addEventListener("change", refreshMapData);
 modeSelect.addEventListener("change", refreshMapData);
+themeSelect.addEventListener("change", () => applyTheme(themeSelect.value));
+closeDetailsButton.addEventListener("click", closeDetails);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.selectedRegionId) {
+    closeDetails();
+  }
+});
+
+const resizeObserver = new ResizeObserver(() => {
+  if (state.geojson) renderGeoJsonMap(state.geojson);
+});
+resizeObserver.observe(mapEl);
 
 function colorFor(value, maxValue) {
-  if (!value || !maxValue) return "#263244";
+  if (!value || !maxValue) return "var(--region-base)";
   const intensity = Math.max(0.15, Math.min(value / maxValue, 1));
   const lightness = 34 + (1 - intensity) * 26;
   return `hsl(354, 72%, ${lightness}%)`;
@@ -38,97 +57,27 @@ function summaryByFeature(properties) {
   return summaryByRegionId(properties.region_id);
 }
 
-function eachCoordinateFromGeometry(geometry, callback) {
-  if (!geometry) return;
-
-  if (geometry.type === "Polygon") {
-    for (const ring of geometry.coordinates || []) {
-      for (const coordinate of ring) callback(coordinate);
-    }
-  }
-
-  if (geometry.type === "MultiPolygon") {
-    for (const polygon of geometry.coordinates || []) {
-      for (const ring of polygon) {
-        for (const coordinate of ring) callback(coordinate);
-      }
-    }
-  }
+function applyTheme(theme) {
+  const normalizedTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = normalizedTheme;
+  themeSelect.value = normalizedTheme;
+  localStorage.setItem("uair-theme", normalizedTheme);
 }
 
-function computeBounds(features) {
-  const bounds = {
-    minLon: Infinity,
-    minLat: Infinity,
-    maxLon: -Infinity,
-    maxLat: -Infinity,
-  };
-
-  for (const feature of features) {
-    eachCoordinateFromGeometry(feature.geometry, ([lon, lat]) => {
-      bounds.minLon = Math.min(bounds.minLon, lon);
-      bounds.minLat = Math.min(bounds.minLat, lat);
-      bounds.maxLon = Math.max(bounds.maxLon, lon);
-      bounds.maxLat = Math.max(bounds.maxLat, lat);
-    });
-  }
-
-  return bounds;
+function shortenRegionLabel(name) {
+  return name
+    .replace(/\s+\u043e\u0431\u043b\u0430\u0441\u0442\u044c$/u, "")
+    .replace(
+      /^\u0410\u0432\u0442\u043e\u043d\u043e\u043c\u043d\u0430\s+\u0420\u0435\u0441\u043f\u0443\u0431\u043b\u0456\u043a\u0430\s+/u,
+      "",
+    );
 }
 
-function projectCoordinate([lon, lat], bounds) {
-  return [
-    (lon - bounds.minLon) * PROJECTION_SCALE + VIEWBOX_PADDING,
-    (bounds.maxLat - lat) * PROJECTION_SCALE + VIEWBOX_PADDING,
-  ];
-}
-
-function ringToPath(ring, bounds) {
-  return ring
-    .map((coordinate, index) => {
-      const [x, y] = projectCoordinate(coordinate, bounds);
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ")
-    .concat(" Z");
-}
-
-function geometryToPath(geometry, bounds) {
-  if (!geometry) return "";
-
-  if (geometry.type === "Polygon") {
-    return (geometry.coordinates || []).map((ring) => ringToPath(ring, bounds)).join(" ");
-  }
-
-  if (geometry.type === "MultiPolygon") {
-    return (geometry.coordinates || [])
-      .flatMap((polygon) => polygon.map((ring) => ringToPath(ring, bounds)))
-      .join(" ");
-  }
-
-  return "";
-}
-
-function featureLabelPoint(feature, bounds) {
-  const featureBounds = {
-    minX: Infinity,
-    minY: Infinity,
-    maxX: -Infinity,
-    maxY: -Infinity,
-  };
-
-  eachCoordinateFromGeometry(feature.geometry, (coordinate) => {
-    const [x, y] = projectCoordinate(coordinate, bounds);
-    featureBounds.minX = Math.min(featureBounds.minX, x);
-    featureBounds.minY = Math.min(featureBounds.minY, y);
-    featureBounds.maxX = Math.max(featureBounds.maxX, x);
-    featureBounds.maxY = Math.max(featureBounds.maxY, y);
-  });
-
-  return {
-    x: (featureBounds.minX + featureBounds.maxX) / 2,
-    y: (featureBounds.minY + featureBounds.maxY) / 2,
-  };
+function mapSize() {
+  const bounds = mapEl.getBoundingClientRect();
+  const width = Math.max(320, Math.floor(bounds.width - MAP_PADDING * 2));
+  const height = Math.max(320, Math.floor(bounds.height - MAP_PADDING * 2));
+  return { width, height };
 }
 
 function clearSvg() {
@@ -149,19 +98,30 @@ function createSvgElement(tagName, attributes = {}) {
 function selectRegion(summary) {
   if (!summary?.region_id) return;
   state.selectedRegionId = summary.region_id;
+  detailsPanel.classList.add("is-open");
+  detailsPanel.setAttribute("aria-hidden", "false");
   renderDetails(summary);
   loadDaily(summary.region_id);
   updateMapColors();
 }
 
+function closeDetails() {
+  state.selectedRegionId = null;
+  detailsPanel.classList.remove("is-open");
+  detailsPanel.setAttribute("aria-hidden", "true");
+  dailyChartEl.replaceChildren();
+  updateMapColors();
+}
+
 function renderGeoJsonMap(geojson) {
   const features = geojson.features || [];
-  const bounds = computeBounds(features);
-  const width = (bounds.maxLon - bounds.minLon) * PROJECTION_SCALE + VIEWBOX_PADDING * 2;
-  const height = (bounds.maxLat - bounds.minLat) * PROJECTION_SCALE + VIEWBOX_PADDING * 2;
+  const { width, height } = mapSize();
+  const projection = d3.geoMercator();
+  projection.fitSize([width, height], geojson);
+  const geoPath = d3.geoPath(projection);
 
   clearSvg();
-  mapSvg.setAttribute("viewBox", `0 0 ${width.toFixed(2)} ${height.toFixed(2)}`);
+  mapSvg.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
   const regionsGroup = createSvgElement("g", { class: "map-regions" });
   const labelsGroup = createSvgElement("g", { class: "map-labels" });
@@ -169,13 +129,15 @@ function renderGeoJsonMap(geojson) {
   for (const feature of features) {
     const properties = feature.properties || {};
     const regionId = String(properties.region_id || "").trim();
-    const pathData = geometryToPath(feature.geometry, bounds);
+    const pathData = geoPath(feature);
     if (!regionId || !pathData) continue;
 
     const path = createSvgElement("path", {
       class: "region",
       d: pathData,
       "data-region-id": regionId,
+      "fill-rule": "evenodd",
+      "clip-rule": "evenodd",
       tabindex: "0",
       role: "button",
       "aria-label": regionName(properties),
@@ -188,19 +150,21 @@ function renderGeoJsonMap(geojson) {
       }
     });
 
-    const labelPoint = featureLabelPoint(feature, bounds);
-    const label = createSvgElement("text", {
-      class: "region-label",
-      x: labelPoint.x.toFixed(2),
-      y: labelPoint.y.toFixed(2),
-      "data-region-id": regionId,
-    });
-    label.textContent = regionName(properties)
-      .replace(" область", "")
-      .replace("Автономна Республіка ", "");
+    const [centroidX, centroidY] = geoPath.centroid(feature);
+    let label = null;
+    if (Number.isFinite(centroidX) && Number.isFinite(centroidY)) {
+      const labelOffset = LABEL_OFFSETS[regionId] || [0, 0];
+      label = createSvgElement("text", {
+        class: "region-label",
+        x: (centroidX + labelOffset[0]).toFixed(2),
+        y: (centroidY + labelOffset[1]).toFixed(2),
+        "data-region-id": regionId,
+      });
+      label.textContent = shortenRegionLabel(regionName(properties));
+    }
 
     regionsGroup.appendChild(path);
-    labelsGroup.appendChild(label);
+    if (label) labelsGroup.appendChild(label);
     state.svgFeatures.set(regionId, { path, label, properties });
   }
 
@@ -218,7 +182,7 @@ function updateMapColors() {
 
     item.path.style.fill = colorFor(summary?.metric_value, maxValue);
     item.path.classList.toggle("is-selected", isSelected);
-    item.label.classList.toggle("is-selected", isSelected);
+    item.label?.classList.toggle("is-selected", isSelected);
   }
 }
 
@@ -242,6 +206,13 @@ async function refreshMapData() {
   state.summariesByRegionId = new Map(
     state.summaries.map((item) => [String(item.region_id || "").trim(), item]),
   );
+  if (state.selectedRegionId) {
+    const selectedSummary = summaryByRegionId(state.selectedRegionId);
+    if (selectedSummary) {
+      renderDetails(selectedSummary);
+      loadDaily(selectedSummary.region_id);
+    }
+  }
   updateMapColors();
   statusEl.textContent = state.summaries.length
     ? `Loaded ${state.summaries.length} regional summaries.`
@@ -269,30 +240,48 @@ async function loadDaily(regionId) {
   const days = daysSelect.value;
   const response = await fetch(`/api/regions/${regionId}/daily?days=${days}`);
   const payload = await response.json();
-  const labels = payload.stats.map((item) => item.date);
-  const counts = payload.stats.map((item) => item.alert_count);
-  const durations = payload.stats.map((item) => Math.round(item.total_duration_minutes / 60));
-  const canvas = document.querySelector("#daily-chart");
+  renderDailyChart(payload.stats);
+}
 
-  if (state.chart) state.chart.destroy();
-  state.chart = new Chart(canvas, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        { label: "Alerts", data: counts, backgroundColor: "#c91d2e" },
-        { label: "Hours", data: durations, backgroundColor: "#f0a0a9" },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true } },
-    },
-  });
+function renderDailyChart(stats) {
+  dailyChartEl.replaceChildren();
+
+  const maxCount = Math.max(...stats.map((item) => item.alert_count), 1);
+  const maxHours = Math.max(...stats.map((item) => item.total_duration_minutes / 60), 1);
+
+  const header = document.createElement("div");
+  header.className = "chart-header";
+  header.innerHTML = "<span>Date</span><span>Alerts</span><span>Hours</span>";
+  dailyChartEl.appendChild(header);
+
+  for (const item of stats) {
+    const hours = item.total_duration_minutes / 60;
+    const row = document.createElement("div");
+    row.className = "chart-row";
+
+    const date = document.createElement("span");
+    date.className = "chart-date";
+    date.textContent = item.date;
+
+    const countBar = document.createElement("span");
+    countBar.className = "bar-cell";
+    countBar.innerHTML = `<span class="bar count-bar" style="--bar-value: ${
+      item.alert_count / maxCount
+    }"></span><span class="bar-value">${item.alert_count}</span>`;
+
+    const durationBar = document.createElement("span");
+    durationBar.className = "bar-cell";
+    durationBar.innerHTML = `<span class="bar duration-bar" style="--bar-value: ${
+      hours / maxHours
+    }"></span><span class="bar-value">${hours.toFixed(1)}</span>`;
+
+    row.append(date, countBar, durationBar);
+    dailyChartEl.appendChild(row);
+  }
 }
 
 async function init() {
+  applyTheme(localStorage.getItem("uair-theme") || "light");
   await Promise.all([loadGeoJson(), refreshMapData()]);
   updateMapColors();
 }
