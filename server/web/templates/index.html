@@ -26,25 +26,9 @@
           </div>
           <div class="toolbar-actions">
             <span id="filter-summary" class="filter-summary" aria-live="polite"></span>
-            <div class="popover" id="help-popover">
-              <button
-                class="action-button"
-                id="help-toggle"
-                type="button"
-                aria-expanded="false"
-                aria-controls="help-panel"
-              >
-                Довідка
-              </button>
-              <div class="popover-panel help-content" id="help-panel" hidden>
-                <p><strong>Count</strong> показує кількість суцільних періодів тривоги за обраний період.</p>
-                <p><strong>Duration</strong> показує сумарні години, коли область була під тривогою.</p>
-                <p><strong>Combined</strong> змішує нормалізовані Count і Duration в один коефіцієнт від 0 до 1.</p>
-                <p>Якщо тривога активна хоча б в одному районі області, область вважається під тривогою.</p>
-                <p><strong>Districts</strong> показує районні межі, але до появи районного датасету колір і клік беруть статистику parent-області.</p>
-              </div>
-            </div>
-            <button class="action-button" id="theme-toggle" type="button">Темна</button>
+            <a class="nav-link" href="/about" data-i18n="nav.about">Про проект</a>
+            <button class="icon-button" id="theme-toggle" type="button" data-i18n-aria-label="theme.dark"></button>
+            <button class="language-button" id="language-toggle" type="button" data-i18n-aria-label="language.toggle">EN</button>
             <div class="popover" id="filters-popover">
               <button
                 class="action-button"
@@ -57,40 +41,40 @@
               </button>
               <div class="popover-panel filter-panel" id="filters-panel" hidden>
                 <label>
-                  Map level
+                  <span data-i18n="filters.mapLevel">Рівень карти</span>
                   <select id="map-level">
-                    <option value="regions" selected>Regions</option>
-                    <option value="districts">Districts</option>
+                    <option value="regions" selected data-i18n="filters.regions">Області</option>
+                    <option value="districts" data-i18n="filters.districts">Райони</option>
                   </select>
                 </label>
                 <label class="toggle-field">
                   <input id="show-labels" type="checkbox" checked />
-                  Show oblast names
+                  <span data-i18n="filters.showLabels">Показувати назви областей</span>
                 </label>
                 <div class="date-fields">
                   <label>
-                    Start date
+                    <span data-i18n="filters.startDate">Дата початку</span>
                     <input id="start-date" type="date" />
                   </label>
                   <label>
-                    End date
+                    <span data-i18n="filters.endDate">Дата завершення</span>
                     <input id="end-date" type="date" />
                   </label>
                 </div>
                 <label>
-                  Period
+                  <span data-i18n="filters.period">Період</span>
                   <select id="days">
-                    <option value="7" selected>7 days</option>
-                    <option value="14">14 days</option>
-                    <option value="30">30 days</option>
+                    <option value="7" selected data-i18n="filters.sevenDays">7 днів</option>
+                    <option value="14" data-i18n="filters.fourteenDays">14 днів</option>
+                    <option value="30" data-i18n="filters.thirtyDays">30 днів</option>
                   </select>
                 </label>
                 <label>
-                  Mode
+                  <span data-i18n="filters.mode">Метрика</span>
                   <select id="mode">
-                    <option value="combined" selected>Combined</option>
-                    <option value="count">Count</option>
-                    <option value="duration">Duration</option>
+                    <option value="combined" selected data-i18n="filters.combined">Комбіновано</option>
+                    <option value="count" data-i18n="filters.count">Кількість</option>
+                    <option value="duration" data-i18n="filters.duration">Тривалість</option>
                   </select>
                 </label>
               </div>
@@ -106,24 +90,44 @@
           ></svg>
         </div>
       </section>
+      <section class="update-log" id="update-log-panel" aria-live="polite">
+        <div class="update-log-header">
+          <h2 data-i18n="updates.title">Оновлення</h2>
+          <span id="update-log-status">-</span>
+        </div>
+        <div id="update-log-list" class="update-log-list"></div>
+      </section>
+      <nav class="bottom-menu" aria-label="Map tools">
+        <button class="bottom-menu-button" id="bottom-filters-toggle" type="button" aria-label="Фільтри" data-i18n-aria-label="common.filters" aria-expanded="false" aria-controls="filters-panel">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 6h16M7 12h10M10 18h4" />
+          </svg>
+          <span data-i18n="common.filters">Фільтри</span>
+        </button>
+        <button class="bottom-menu-button" id="update-log-toggle" type="button" aria-label="Журнал оновлень" data-i18n-aria-label="common.updateLog" aria-expanded="false" aria-controls="update-log-panel">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 5v14h14M8 15l3-3 3 2 4-6" />
+          </svg>
+        </button>
+      </nav>
       <div id="map-tooltip" class="map-tooltip" role="status" aria-hidden="true"></div>
 
       <aside class="details" id="region-details" aria-hidden="true" aria-live="polite">
         <div class="details-header">
-          <h2 id="region-title">Select a region</h2>
-          <button id="details-close" type="button" aria-label="Close details">&times;</button>
+          <h2 id="region-title" data-i18n="details.selectRegion">Оберіть регіон</h2>
+          <button id="details-close" type="button" aria-label="Закрити деталі" data-i18n-aria-label="details.close">&times;</button>
         </div>
         <dl class="metrics">
           <div>
-            <dt>Alerts</dt>
+            <dt data-i18n="details.alerts">Тривоги</dt>
             <dd id="metric-count">-</dd>
           </div>
           <div>
-            <dt>Total duration</dt>
+            <dt data-i18n="details.totalDuration">Загальна тривалість</dt>
             <dd id="metric-duration">-</dd>
           </div>
           <div>
-            <dt>Average duration</dt>
+            <dt data-i18n="details.averageDuration">Середня тривалість</dt>
             <dd id="metric-average">-</dd>
           </div>
         </dl>
@@ -133,6 +137,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/d3-array@3"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-geo@3"></script>
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/theme.js"></script>
     <script src="/static/js/app.js"></script>
   </body>
 </html>

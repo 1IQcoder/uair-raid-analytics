@@ -27,6 +27,8 @@ uvicorn server.main:app --reload
 
 Open the app at `http://127.0.0.1:8000`.
 
+The product about page is available at `http://127.0.0.1:8000/about`.
+
 ## Important Notes
 
 - The repository does not include a sample dataset.
@@ -53,6 +55,7 @@ python scripts/sync_alertsua_raions.py --once
 
 - User-facing API requests always read local SQLite data. They never call alerts.in.ua directly.
 - The alerts.in.ua worker requests history by oblast UID and extracts raion records from the response; it does not request history by raion UID.
+- The map screen polls a local update journal endpoint so raion sync progress is visible while the worker runs.
 
 ## Documentation
 

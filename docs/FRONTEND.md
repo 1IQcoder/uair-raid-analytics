@@ -45,6 +45,15 @@ District fill and tooltip use `alertsua_location_uid` when cached raion data exi
 5. User can switch map level between regions and districts.
 6. User can show/hide oblast labels.
 7. User can use either a rolling `days` window or explicit `start_date` / `end_date`.
+   In district mode, explicit dates are constrained to the last 31 days because the cached raion source is alerts.in.ua `month_ago`.
 8. User clicks a region or district.
 9. App requests `/api/regions/{region_id}/daily` for the parent oblast detail popup.
 10. Detail popup updates metrics and the HTML chart.
+
+## About And Update Journal
+
+The `/about` route explains the product goal, map levels, metric modes, filters, and data sources.
+
+The main map screen includes a compact update journal. It polls `/api/update-log` every 30 seconds so raion worker progress becomes visible while `scripts/sync_alertsua_raions.py --loop` is running.
+
+The frontend supports Ukrainian and English through `server/web/static/js/i18n.js`. The selected language is stored in `localStorage` and shared by the map page and `/about`.

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Про проект - {{ app_name }}</title>
+    <link
+      rel="icon"
+      href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%230d121a"/><path d="M18 42h28l-4-18c-1-5-5-8-10-8s-9 3-10 8l-4 18Z" fill="%23c91d2e"/><path d="M15 47h34" stroke="%23f7f9fc" stroke-width="6" stroke-linecap="round"/><path d="M32 8v5M14 16l4 4M50 16l-4 4" stroke="%23f7f9fc" stroke-width="4" stroke-linecap="round"/></svg>'
+    />
+    <link rel="stylesheet" href="/static/css/app.css" />
+  </head>
+  <body class="help-page">
+    <header class="toolbar about-toolbar">
+      <div class="brand">
+        <div class="title-row">
+          <h1>UAir-raid-analytics</h1>
+          <svg class="title-icon" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M18 42h28l-4-18c-1-5-5-8-10-8s-9 3-10 8l-4 18Z" />
+            <path d="M15 47h34" />
+            <path d="M32 8v5M14 16l4 4M50 16l-4 4" />
+          </svg>
+        </div>
+      </div>
+      <div class="toolbar-actions">
+        <a class="nav-link" href="/" data-i18n="nav.map">Карта</a>
+        <button class="icon-button" id="theme-toggle" type="button" data-i18n-aria-label="theme.dark"></button>
+        <button class="language-button" id="language-toggle" type="button" data-i18n-aria-label="language.toggle">EN</button>
+      </div>
+    </header>
+    <main class="help-layout">
+      <header class="help-header">
+        <a class="help-back" href="/" data-i18n="about.back">← Назад до мапи</a>
+        <h1 data-i18n="about.title">Про проект</h1>
+      </header>
+
+      <section class="help-section">
+        <h2 data-i18n="about.purposeTitle">Що показує сайт</h2>
+        <p data-i18n="about.purposeText">
+          UAir-raid-analytics показує історичну статистику повітряних тривог в Україні на
+          інтерактивній карті. За допомогою сайту можна порівняти області або райони між собою:
+          де тривоги оголошували частіше, де вони тривали довше, і як змінюється картина залежно
+          від вибраного періоду.
+        </p>
+      </section>
+
+      <section class="help-section">
+        <h2 data-i18n="about.levelsTitle">Режими карти</h2>
+        <p data-i18n="about.regionsText">У режимі областей кожна область має свій колір відповідно до вибраної метрики. Цей режим використовує основний історичний датасет, тому підходить для аналізу довших періодів.</p>
+        <p data-i18n="about.districtsText">У режимі районів карта показує межі районів. Дані для районів беруться з локального кешу alerts.in.ua, який оновлюється окремим фоновим воркером. Через обмеження джерела районна статистика доступна тільки за останній місяць.</p>
+        <p data-i18n="about.clickText">Якщо натиснути на район, відкриється детальна статистика відповідної області. Районний режим потрібен для більш детальної візуалізації на карті, а детальний графік поки залишається обласним.</p>
+      </section>
+
+      <section class="help-section">
+        <h2 data-i18n="about.metricsTitle">Що означають метрики</h2>
+        <p data-i18n="about.countText">Кількість показує, скільки разів за вибраний період починались окремі періоди тривоги. Якщо тривога триває без перерви, вона рахується як один період, навіть якщо всередині області змінювались окремі райони.</p>
+        <p data-i18n="about.durationText">Тривалість показує сумарний час тривог за вибраний період. Значення відображається в годинах і допомагає побачити не тільки частоту тривог, а й те, наскільки довго вони тривали.</p>
+        <p data-i18n="about.combinedText">Комбіновано поєднує кількість тривог і їхню тривалість в один індекс від 0 до 1. Цей режим зручний для швидкого порівняння регіонів на карті, коли важливі обидва фактори.</p>
+      </section>
+
+      <section class="help-section">
+        <h2 data-i18n="about.filtersTitle">Як працюють фільтри</h2>
+        <p data-i18n="about.filtersText">Фільтри керують тим, які дані потрапляють на карту. Можна вибрати рівень карти, метрику, готовий період на кшталт 7 або 30 днів, або вручну задати початкову й кінцеву дату.</p>
+        <p data-i18n="about.raionDateText">Для районного режиму доступний лише останній місяць. Це пов'язано з тим, що alerts.in.ua надає історію районних тривог саме за такий проміжок, а сайт не звертається до зовнішнього API під час відкриття сторінки.</p>
+        <p data-i18n="about.noDataText">Якщо для району немає кешованих даних за вибраний період, район позначається сірим. При наведенні на нього з'явиться підказка, що даних за цей період немає.</p>
+      </section>
+
+      <section class="help-section">
+        <h2 data-i18n="about.sourcesTitle">Звідки беруться дані</h2>
+        <p data-i18n="about.oblastSourceText">Статистика по областях оновлюється з Vadimkin Ukrainian Air Raid Sirens Dataset. Після оновлення датасету бекенд агрегує події в обласні підсумки для вибраного періоду.</p>
+        <p data-i18n="about.raionSourceText">Статистика по районах кешується локально з alerts.in.ua фоновим воркером. Користувацькі запити читають тільки локальну базу даних, тому frontend не викликає alerts.in.ua напряму і не передає API-токен у браузер.</p>
+      </section>
+    </main>
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/theme.js"></script>
+  </body>
+</html>

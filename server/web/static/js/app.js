@@ -4,6 +4,8 @@ const MAP_SOURCES = {
   regions: "/static/geo/ukraine_regions.geojson",
   districts: "/static/geo/ukraine_districts.geojson",
 };
+const RAION_HISTORY_DAYS = 31;
+const UPDATE_LOG_INTERVAL_MS = 30000;
 const LABEL_OFFSETS = {
   14: [0, 28],
   31: [0, -14],
@@ -20,6 +22,7 @@ const state = {
   geojsonByLevel: new Map(),
   svgFeatures: [],
   svgLabels: [],
+  dailyStats: [],
 };
 
 const mapEl = document.querySelector("#map");
@@ -37,18 +40,22 @@ const helpPanel = document.querySelector("#help-panel");
 const filtersPanel = document.querySelector("#filters-panel");
 const filterSummaryEl = document.querySelector("#filter-summary");
 const tooltipEl = document.querySelector("#map-tooltip");
+const updateLogStatusEl = document.querySelector("#update-log-status");
+const updateLogListEl = document.querySelector("#update-log-list");
+const bottomFiltersToggle = document.querySelector("#bottom-filters-toggle");
+const updateLogToggle = document.querySelector("#update-log-toggle");
+const updateLogEl = document.querySelector(".update-log");
 const detailsPanel = document.querySelector("#region-details");
 const closeDetailsButton = document.querySelector("#details-close");
 const dailyChartEl = document.querySelector("#daily-chart");
 
 mapLevelSelect.addEventListener("change", changeMapLevel);
 showLabelsInput.addEventListener("change", toggleLabels);
-startDateInput.addEventListener("change", refreshMapData);
-endDateInput.addEventListener("change", refreshMapData);
+startDateInput.addEventListener("change", handleDateFilterChange);
+endDateInput.addEventListener("change", handleDateFilterChange);
 daysSelect.addEventListener("change", refreshMapData);
 modeSelect.addEventListener("change", refreshMapData);
-themeToggle.addEventListener("click", toggleTheme);
-helpToggle.addEventListener("click", (event) => {
+helpToggle?.addEventListener("click", (event) => {
   event.stopPropagation();
   togglePopover(helpPanel, helpToggle);
 });
@@ -56,16 +63,41 @@ filtersToggle.addEventListener("click", (event) => {
   event.stopPropagation();
   togglePopover(filtersPanel, filtersToggle);
 });
-helpPanel.addEventListener("click", (event) => event.stopPropagation());
+bottomFiltersToggle?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  closeUpdateLog();
+  togglePopover(filtersPanel, bottomFiltersToggle);
+});
+updateLogToggle?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  closePopovers();
+  const isOpen = updateLogEl?.classList.toggle("is-open") || false;
+  updateLogToggle.setAttribute("aria-expanded", String(isOpen));
+});
+helpPanel?.addEventListener("click", (event) => event.stopPropagation());
 filtersPanel.addEventListener("click", (event) => event.stopPropagation());
+updateLogEl?.addEventListener("click", (event) => event.stopPropagation());
 closeDetailsButton.addEventListener("click", closeDetails);
-document.addEventListener("click", closePopovers);
+document.addEventListener("click", () => {
+  closePopovers();
+  closeUpdateLog();
+});
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && state.selectedRegionId) {
     closeDetails();
   }
   if (event.key === "Escape") {
     closePopovers();
+    closeUpdateLog();
+  }
+});
+window.addEventListener("uair:languagechange", () => {
+  updateFilterSummary();
+  if (state.dailyStats.length) {
+    renderDailyChart(state.dailyStats);
+  }
+  if (!state.selectedRegionId) {
+    document.querySelector("#region-title").textContent = t("details.selectRegion");
   }
 });
 
@@ -124,9 +156,9 @@ function displaySummaryByFeature(properties) {
 
 function currentModeLabel() {
   const mode = modeSelect.value;
-  if (mode === "count") return "Alerts";
-  if (mode === "duration") return "Hours";
-  return "Coefficient";
+  if (mode === "count") return t("metric.alerts");
+  if (mode === "duration") return t("metric.hours");
+  return t("metric.coefficient");
 }
 
 function metricTooltipValue(summary) {
@@ -150,12 +182,16 @@ function isDistrictWithoutData(properties) {
 function tooltipText(properties) {
   const summary = displaySummaryByFeature(properties);
   const title = isDistrictMode()
-    ? `${districtName(properties)} - ${regionName(properties)}`
+    ? `${t("tooltip.districtPrefix")} ${districtName(properties)} - ${regionName(properties)}`
     : regionName(properties);
   if (isDistrictWithoutData(properties)) {
-    return `${title}: Немає даних за цей період`;
+    return `${title}: ${t("tooltip.noData")}`;
   }
   return `${title} (${currentModeLabel()}: ${metricTooltipValue(summary)})`;
+}
+
+function t(key, fallback = "") {
+  return window.uairT ? window.uairT(key, fallback) : fallback || key;
 }
 
 function showTooltip(event, properties) {
@@ -182,10 +218,22 @@ function hideTooltip() {
   tooltipEl.setAttribute("aria-hidden", "true");
 }
 
+function themeIcon(theme) {
+  if (theme === "dark") {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.6A8 8 0 0 1 9.4 3 7 7 0 1 0 21 14.6Z"/></svg>';
+  }
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></svg>';
+}
+
 function applyTheme(theme) {
   const normalizedTheme = theme === "dark" ? "dark" : "light";
   document.documentElement.dataset.theme = normalizedTheme;
-  themeToggle.textContent = normalizedTheme === "dark" ? "Світла" : "Темна";
+  themeToggle.setAttribute(
+    "aria-label",
+    normalizedTheme === "dark" ? "Увімкнути світлу тему" : "Увімкнути темну тему",
+  );
+  themeToggle.innerHTML = themeIcon(normalizedTheme);
+  themeToggle.classList.toggle("is-dark", normalizedTheme === "dark");
   themeToggle.setAttribute(
     "aria-label",
     normalizedTheme === "dark" ? "Увімкнути світлу тему" : "Увімкнути темну тему",
@@ -206,10 +254,18 @@ function togglePopover(panel, button) {
 }
 
 function closePopovers() {
-  helpPanel.hidden = true;
+  if (helpPanel) {
+    helpPanel.hidden = true;
+  }
   filtersPanel.hidden = true;
-  helpToggle.setAttribute("aria-expanded", "false");
+  helpToggle?.setAttribute("aria-expanded", "false");
   filtersToggle.setAttribute("aria-expanded", "false");
+  bottomFiltersToggle?.setAttribute("aria-expanded", "false");
+}
+
+function closeUpdateLog() {
+  updateLogEl?.classList.remove("is-open");
+  updateLogToggle?.setAttribute("aria-expanded", "false");
 }
 
 function selectedDateRange() {
@@ -250,6 +306,48 @@ function dailyQueryParams() {
     params.set("end_date", dateRange.endDate);
   }
   return params;
+}
+
+function dateToInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function raionDateBounds() {
+  const maxDate = new Date();
+  const minDate = new Date(maxDate);
+  minDate.setDate(maxDate.getDate() - RAION_HISTORY_DAYS);
+  return {
+    min: dateToInputValue(minDate),
+    max: dateToInputValue(maxDate),
+  };
+}
+
+function clampDateInput(input, min, max) {
+  if (!input.value) return;
+  if (input.value < min) input.value = min;
+  if (input.value > max) input.value = max;
+}
+
+function applyFilterConstraints() {
+  if (isDistrictMode()) {
+    const { min, max } = raionDateBounds();
+    startDateInput.min = min;
+    startDateInput.max = max;
+    endDateInput.min = min;
+    endDateInput.max = max;
+    clampDateInput(startDateInput, min, max);
+    clampDateInput(endDateInput, min, max);
+    return;
+  }
+  startDateInput.removeAttribute("min");
+  startDateInput.removeAttribute("max");
+  endDateInput.removeAttribute("min");
+  endDateInput.removeAttribute("max");
+}
+
+function handleDateFilterChange() {
+  applyFilterConstraints();
+  refreshMapData();
 }
 
 function shortenRegionLabel(name) {
@@ -298,6 +396,8 @@ function closeDetails() {
   state.selectedRegionId = null;
   detailsPanel.classList.remove("is-open");
   detailsPanel.setAttribute("aria-hidden", "true");
+  document.querySelector("#region-title").textContent = t("details.selectRegion");
+  state.dailyStats = [];
   dailyChartEl.replaceChildren();
   updateMapColors();
 }
@@ -444,6 +544,7 @@ async function changeMapLevel() {
   state.mapLevel = mapLevelSelect.value === "districts" ? "districts" : "regions";
   closeDetails();
   hideTooltip();
+  applyFilterConstraints();
   updateFilterSummary();
   await loadGeoJson(state.mapLevel);
   await refreshMapData();
@@ -503,18 +604,21 @@ function renderDetails(summary) {
 async function loadDaily(regionId) {
   const response = await fetch(`/api/regions/${regionId}/daily?${dailyQueryParams()}`);
   const payload = await response.json();
-  renderDailyChart(payload.stats);
+  state.dailyStats = payload.stats || [];
+  renderDailyChart(state.dailyStats);
 }
 
 function renderDailyChart(stats) {
   dailyChartEl.replaceChildren();
+
+  if (!stats.length) return;
 
   const maxCount = Math.max(...stats.map((item) => item.alert_count), 1);
   const maxHours = Math.max(...stats.map((item) => item.total_duration_minutes / 60), 1);
 
   const header = document.createElement("div");
   header.className = "chart-header";
-  header.innerHTML = "<span>Date</span><span>Alerts</span><span>Hours</span>";
+  header.innerHTML = `<span>${t("chart.date")}</span><span>${t("chart.alerts")}</span><span>${t("chart.hours")}</span>`;
   dailyChartEl.appendChild(header);
 
   for (const item of stats) {
@@ -543,9 +647,61 @@ function renderDailyChart(stats) {
   }
 }
 
+function formatDateTime(value) {
+  if (!value) return t("status.noData");
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return t("status.noData");
+  const locale = window.currentUairLanguage?.() === "en" ? "en-US" : "uk-UA";
+  return date.toLocaleString(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function renderUpdateLog(entries) {
+  updateLogListEl.replaceChildren();
+  for (const entry of entries.slice(0, 5)) {
+    const row = document.createElement("div");
+    row.className = `update-log-row is-${entry.status || "unknown"}`;
+
+    const title = document.createElement("span");
+    title.className = "update-log-title";
+    title.textContent = entry.title;
+
+    const meta = document.createElement("span");
+    meta.className = "update-log-meta";
+    meta.textContent = `${entry.status || "unknown"} · ${formatDateTime(entry.updated_at)}`;
+
+    const details = document.createElement("span");
+    details.className = "update-log-details";
+    details.textContent = entry.details || "";
+
+    row.append(title, meta, details);
+    updateLogListEl.appendChild(row);
+  }
+}
+
+async function loadUpdateLog() {
+  try {
+    const response = await fetch("/api/update-log");
+    if (!response.ok) throw new Error("Update log is not available.");
+    const payload = await response.json();
+    renderUpdateLog(payload.entries || []);
+    updateLogStatusEl.textContent = formatDateTime(new Date().toISOString());
+  } catch (error) {
+    updateLogStatusEl.textContent = t("status.error");
+    console.error(error);
+  }
+}
+
 async function init() {
-  applyTheme(localStorage.getItem("uair-theme") || "light");
+  applyFilterConstraints();
   await Promise.all([loadGeoJson(), refreshMapData()]);
+  loadUpdateLog();
+  window.setInterval(loadUpdateLog, UPDATE_LOG_INTERVAL_MS);
   updateMapColors();
 }
 

@@ -82,6 +82,16 @@ Returns daily local-cache statistics for one alerts.in.ua raion.
 
 Returns local oblast-based sync state rows for alerts.in.ua history requests. The worker requests oblast history and extracts raion records from each response.
 
+## `GET /api/update-log`
+
+Returns a compact local update journal for the UI. It combines:
+
+- the latest oblast dataset refresh;
+- current raion worker sync state;
+- latest synced/failed/pending oblast sync rows.
+
+The endpoint reads local DB state only and never calls alerts.in.ua.
+
 ## `GET /api/meta`
 
 Returns dataset metadata:

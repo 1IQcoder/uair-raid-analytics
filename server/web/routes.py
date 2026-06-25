@@ -17,3 +17,12 @@ def index(request: Request):
         name="index.html",
         context={"app_name": settings.app_name},
     )
+
+
+@router.get("/about")
+def about_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="help.html",
+        context={"app_name": settings.app_name},
+    )

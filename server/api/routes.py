@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from server.analytics.metrics import (
@@ -17,6 +18,7 @@ from server.analytics.raion_metrics import (
     raion_sync_status,
 )
 from server.database import get_session
+from server.models import AlertsUaRaionEvent, AlertsUaSyncState, DatasetRefreshLog
 from server.schemas import (
     DatasetMeta,
     RaionDailyResponse,
@@ -111,6 +113,58 @@ def get_raion_daily(
         start_date=start_date,
         end_date=end_date,
     )
+
+
+@router.get("/update-log")
+def get_update_log(session: Session = Depends(get_session)) -> dict:
+    latest_oblast_refresh = session.scalar(select(func.max(DatasetRefreshLog.refreshed_at)))
+    latest_raion_sync = session.scalar(select(func.max(AlertsUaSyncState.last_synced_at)))
+    latest_raion_event = session.scalar(select(func.max(AlertsUaRaionEvent.refreshed_at)))
+    raion_events = session.scalar(select(func.count(AlertsUaRaionEvent.id))) or 0
+    states = list(
+        session.scalars(
+            select(AlertsUaSyncState).order_by(
+                AlertsUaSyncState.last_synced_at.desc().nullslast(),
+                AlertsUaSyncState.oblast_name,
+            )
+        )
+    )
+    status_counts: dict[str, int] = {}
+    for state in states:
+        status_counts[state.status] = status_counts.get(state.status, 0) + 1
+    status_summary = ", ".join(
+        f"{status}: {count}" for status, count in sorted(status_counts.items())
+    ) or "немає станів"
+
+    entries = [
+        {
+            "kind": "oblasts",
+            "title": "Області",
+            "status": "synced" if latest_oblast_refresh else "pending",
+            "updated_at": latest_oblast_refresh,
+            "details": "Оновлено основний обласний датасет"
+            if latest_oblast_refresh
+            else "Обласний датасет ще не оновлювався",
+        },
+        {
+            "kind": "raions",
+            "title": "Райони",
+            "status": "synced" if latest_raion_sync else "pending",
+            "updated_at": latest_raion_sync or latest_raion_event,
+            "details": f"Кешовано подій: {raion_events}. Стан областей: {status_summary}",
+        },
+    ]
+    entries.extend(
+        {
+            "kind": "raion-oblast",
+            "title": state.oblast_name,
+            "status": state.status,
+            "updated_at": state.last_synced_at,
+            "details": state.last_error or f"Кешовано подій: {state.total_events_loaded}",
+        }
+        for state in states[:6]
+    )
+    return {"entries": entries}
 
 
 @router.get("/meta", response_model=DatasetMeta)
