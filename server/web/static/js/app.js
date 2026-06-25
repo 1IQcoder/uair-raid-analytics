@@ -1,5 +1,9 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 const MAP_PADDING = 8;
+const MAP_SOURCES = {
+  regions: "/static/geo/ukraine_regions.geojson",
+  districts: "/static/geo/ukraine_districts.geojson",
+};
 const LABEL_OFFSETS = {
   14: [0, 28],
   31: [0, -14],
@@ -8,13 +12,22 @@ const LABEL_OFFSETS = {
 const state = {
   summaries: [],
   summariesByRegionId: new Map(),
+  raionSummaries: [],
+  raionSummariesByLocationUid: new Map(),
   selectedRegionId: null,
-  geojson: null,
-  svgFeatures: new Map(),
+  mapLevel: "regions",
+  showLabels: true,
+  geojsonByLevel: new Map(),
+  svgFeatures: [],
+  svgLabels: [],
 };
 
 const mapEl = document.querySelector("#map");
 const mapSvg = document.querySelector("#ukraine-map");
+const mapLevelSelect = document.querySelector("#map-level");
+const showLabelsInput = document.querySelector("#show-labels");
+const startDateInput = document.querySelector("#start-date");
+const endDateInput = document.querySelector("#end-date");
 const daysSelect = document.querySelector("#days");
 const modeSelect = document.querySelector("#mode");
 const themeToggle = document.querySelector("#theme-toggle");
@@ -28,6 +41,10 @@ const detailsPanel = document.querySelector("#region-details");
 const closeDetailsButton = document.querySelector("#details-close");
 const dailyChartEl = document.querySelector("#daily-chart");
 
+mapLevelSelect.addEventListener("change", changeMapLevel);
+showLabelsInput.addEventListener("change", toggleLabels);
+startDateInput.addEventListener("change", refreshMapData);
+endDateInput.addEventListener("change", refreshMapData);
 daysSelect.addEventListener("change", refreshMapData);
 modeSelect.addEventListener("change", refreshMapData);
 themeToggle.addEventListener("click", toggleTheme);
@@ -53,7 +70,8 @@ document.addEventListener("keydown", (event) => {
 });
 
 const resizeObserver = new ResizeObserver(() => {
-  if (state.geojson) renderGeoJsonMap(state.geojson);
+  const geojson = currentGeoJson();
+  if (geojson) renderGeoJsonMap(geojson);
 });
 resizeObserver.observe(mapEl);
 
@@ -64,8 +82,28 @@ function colorFor(value, maxValue) {
   return `hsl(354, 72%, ${lightness}%)`;
 }
 
+function currentGeoJson() {
+  return state.geojsonByLevel.get(state.mapLevel);
+}
+
+function isDistrictMode() {
+  return state.mapLevel === "districts";
+}
+
+function featureRegionId(properties) {
+  return String(properties.region_id || "").trim();
+}
+
 function regionName(properties) {
-  return properties.region_name || properties.shapeName || "Unknown region";
+  return properties.region_name || properties.adm1_name1 || properties.shapeName || "Unknown region";
+}
+
+function districtName(properties) {
+  return properties.district_name || properties.adm2_name1 || properties.adm2_name || regionName(properties);
+}
+
+function districtMetricUid(properties) {
+  return String(properties.alertsua_location_uid || properties.location_uid || properties.district_id || "").trim();
 }
 
 function summaryByRegionId(regionId) {
@@ -73,7 +111,15 @@ function summaryByRegionId(regionId) {
 }
 
 function summaryByFeature(properties) {
-  return summaryByRegionId(properties.region_id);
+  return summaryByRegionId(featureRegionId(properties));
+}
+
+function raionSummaryByFeature(properties) {
+  return state.raionSummariesByLocationUid.get(districtMetricUid(properties));
+}
+
+function displaySummaryByFeature(properties) {
+  return (isDistrictMode() && raionSummaryByFeature(properties)) || summaryByFeature(properties);
 }
 
 function currentModeLabel() {
@@ -90,9 +136,26 @@ function metricTooltipValue(summary) {
   return Number(summary.metric_value || 0).toFixed(2);
 }
 
+function hasRaionData(summary) {
+  return Boolean(
+    summary
+      && ((summary.alert_count || 0) > 0 || (summary.total_duration_minutes || 0) > 0),
+  );
+}
+
+function isDistrictWithoutData(properties) {
+  return isDistrictMode() && !hasRaionData(raionSummaryByFeature(properties));
+}
+
 function tooltipText(properties) {
-  const summary = summaryByFeature(properties);
-  return `${regionName(properties)} (${currentModeLabel()}: ${metricTooltipValue(summary)})`;
+  const summary = displaySummaryByFeature(properties);
+  const title = isDistrictMode()
+    ? `${districtName(properties)} - ${regionName(properties)}`
+    : regionName(properties);
+  if (isDistrictWithoutData(properties)) {
+    return `${title}: Немає даних за цей період`;
+  }
+  return `${title} (${currentModeLabel()}: ${metricTooltipValue(summary)})`;
 }
 
 function showTooltip(event, properties) {
@@ -149,10 +212,44 @@ function closePopovers() {
   filtersToggle.setAttribute("aria-expanded", "false");
 }
 
+function selectedDateRange() {
+  const startDate = startDateInput.value;
+  const endDate = endDateInput.value;
+  if (!startDate || !endDate) return null;
+  return { startDate, endDate };
+}
+
 function updateFilterSummary() {
-  const daysLabel = daysSelect.selectedOptions[0]?.textContent || `${daysSelect.value} days`;
+  const levelLabel = mapLevelSelect.selectedOptions[0]?.textContent || mapLevelSelect.value;
+  const dateRange = selectedDateRange();
+  const daysLabel = dateRange
+    ? `${dateRange.startDate} - ${dateRange.endDate}`
+    : daysSelect.selectedOptions[0]?.textContent || `${daysSelect.value} days`;
   const modeLabel = modeSelect.selectedOptions[0]?.textContent || modeSelect.value;
-  filterSummaryEl.textContent = `${daysLabel} · ${modeLabel}`;
+  filterSummaryEl.textContent = `${levelLabel} · ${daysLabel} · ${modeLabel}`;
+}
+
+function analyticsQueryParams() {
+  const params = new URLSearchParams({
+    days: daysSelect.value,
+    mode: modeSelect.value,
+  });
+  const dateRange = selectedDateRange();
+  if (dateRange) {
+    params.set("start_date", dateRange.startDate);
+    params.set("end_date", dateRange.endDate);
+  }
+  return params;
+}
+
+function dailyQueryParams() {
+  const params = new URLSearchParams({ days: daysSelect.value });
+  const dateRange = selectedDateRange();
+  if (dateRange) {
+    params.set("start_date", dateRange.startDate);
+    params.set("end_date", dateRange.endDate);
+  }
+  return params;
 }
 
 function shortenRegionLabel(name) {
@@ -175,7 +272,8 @@ function clearSvg() {
   while (mapSvg.firstChild) {
     mapSvg.removeChild(mapSvg.firstChild);
   }
-  state.svgFeatures.clear();
+  state.svgFeatures = [];
+  state.svgLabels = [];
 }
 
 function createSvgElement(tagName, attributes = {}) {
@@ -216,24 +314,32 @@ function renderGeoJsonMap(geojson) {
 
   const regionsGroup = createSvgElement("g", { class: "map-regions" });
   const labelsGroup = createSvgElement("g", { class: "map-labels" });
+  const districtLabelFeatures = new Map();
 
   for (const feature of features) {
     const properties = feature.properties || {};
-    const regionId = String(properties.region_id || "").trim();
+    const regionId = featureRegionId(properties);
     const pathData = geoPath(feature);
     if (!regionId || !pathData) continue;
+    if (isDistrictMode()) {
+      const existing = districtLabelFeatures.get(regionId) || [];
+      existing.push(feature);
+      districtLabelFeatures.set(regionId, existing);
+    }
 
     const path = createSvgElement("path", {
-      class: "region",
+      class: isDistrictMode() ? "region district" : "region",
       d: pathData,
       "data-region-id": regionId,
+      "data-district-id": properties.district_id || "",
+      "data-alertsua-location-uid": properties.alertsua_location_uid || "",
       "fill-rule": "evenodd",
       "clip-rule": "evenodd",
       tabindex: "0",
       role: "button",
-      "aria-label": regionName(properties),
+      "aria-label": isDistrictMode() ? districtName(properties) : regionName(properties),
     });
-    path.addEventListener("click", () => selectRegion(summaryByFeature(properties)));
+    path.addEventListener("click", () => selectRegion(summaryByRegionId(regionId)));
     path.addEventListener("mouseenter", (event) => showTooltip(event, properties));
     path.addEventListener("mousemove", moveTooltip);
     path.addEventListener("mouseleave", hideTooltip);
@@ -242,13 +348,13 @@ function renderGeoJsonMap(geojson) {
     path.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        selectRegion(summaryByFeature(properties));
+        selectRegion(summaryByRegionId(regionId));
       }
     });
 
     const [centroidX, centroidY] = geoPath.centroid(feature);
     let label = null;
-    if (Number.isFinite(centroidX) && Number.isFinite(centroidY)) {
+    if (state.showLabels && !isDistrictMode() && Number.isFinite(centroidX) && Number.isFinite(centroidY)) {
       const labelOffset = LABEL_OFFSETS[regionId] || [0, 0];
       label = createSvgElement("text", {
         class: "region-label",
@@ -260,8 +366,33 @@ function renderGeoJsonMap(geojson) {
     }
 
     regionsGroup.appendChild(path);
-    if (label) labelsGroup.appendChild(label);
-    state.svgFeatures.set(regionId, { path, label, properties });
+    if (label) {
+      labelsGroup.appendChild(label);
+      state.svgLabels.push(label);
+    }
+    state.svgFeatures.push({ regionId, path, label, properties });
+  }
+
+  if (state.showLabels && isDistrictMode()) {
+    for (const [regionId, regionFeatures] of districtLabelFeatures.entries()) {
+      const [centroidX, centroidY] = geoPath.centroid({
+        type: "FeatureCollection",
+        features: regionFeatures,
+      });
+      if (!Number.isFinite(centroidX) || !Number.isFinite(centroidY)) continue;
+
+      const properties = regionFeatures[0]?.properties || {};
+      const labelOffset = LABEL_OFFSETS[regionId] || [0, 0];
+      const label = createSvgElement("text", {
+        class: "region-label",
+        x: (centroidX + labelOffset[0]).toFixed(2),
+        y: (centroidY + labelOffset[1]).toFixed(2),
+        "data-region-id": regionId,
+      });
+      label.textContent = shortenRegionLabel(regionName(properties));
+      labelsGroup.appendChild(label);
+      state.svgLabels.push(label);
+    }
   }
 
   mapSvg.appendChild(regionsGroup);
@@ -270,38 +401,78 @@ function renderGeoJsonMap(geojson) {
 }
 
 function updateMapColors() {
-  const maxValue = Math.max(...state.summaries.map((item) => item.metric_value), 0);
+  const activeSummaries = isDistrictMode() && state.raionSummaries.length
+    ? state.raionSummaries
+    : state.summaries;
+  const maxValue = Math.max(...activeSummaries.map((item) => item.metric_value), 0);
 
-  for (const [regionId, item] of state.svgFeatures.entries()) {
-    const summary = summaryByRegionId(regionId);
-    const isSelected = String(state.selectedRegionId || "") === regionId;
+  for (const item of state.svgFeatures) {
+    const summary = displaySummaryByFeature(item.properties);
+    const isSelected = String(state.selectedRegionId || "") === item.regionId;
+    const hasNoData = isDistrictWithoutData(item.properties);
 
-    item.path.style.fill = colorFor(summary?.metric_value, maxValue);
+    item.path.style.fill = hasNoData ? "var(--region-no-data)" : colorFor(summary?.metric_value, maxValue);
     item.path.classList.toggle("is-selected", isSelected);
+    item.path.classList.toggle("is-no-data", hasNoData);
     item.label?.classList.toggle("is-selected", isSelected);
+  }
+
+  for (const label of state.svgLabels) {
+    const regionId = label.getAttribute("data-region-id");
+    label.classList.toggle("is-selected", String(state.selectedRegionId || "") === regionId);
   }
 }
 
-async function loadGeoJson() {
-  try {
-    const response = await fetch("/static/geo/ukraine_regions.geojson");
-    if (!response.ok) throw new Error("GeoJSON file is not available.");
-    state.geojson = await response.json();
-    renderGeoJsonMap(state.geojson);
-  } catch (error) {
-    console.error("Map geometry is not available. Check /static/geo/ukraine_regions.geojson.", error);
+async function loadGeoJson(level = state.mapLevel) {
+  if (state.geojsonByLevel.has(level)) {
+    renderGeoJsonMap(state.geojsonByLevel.get(level));
+    return;
   }
+
+  try {
+    const response = await fetch(MAP_SOURCES[level]);
+    if (!response.ok) throw new Error("GeoJSON file is not available.");
+    const geojson = await response.json();
+    state.geojsonByLevel.set(level, geojson);
+    renderGeoJsonMap(geojson);
+  } catch (error) {
+    console.error(`Map geometry is not available. Check ${MAP_SOURCES[level]}.`, error);
+  }
+}
+
+async function changeMapLevel() {
+  state.mapLevel = mapLevelSelect.value === "districts" ? "districts" : "regions";
+  closeDetails();
+  hideTooltip();
+  updateFilterSummary();
+  await loadGeoJson(state.mapLevel);
+  await refreshMapData();
+}
+
+function toggleLabels() {
+  state.showLabels = showLabelsInput.checked;
+  const geojson = currentGeoJson();
+  if (geojson) renderGeoJsonMap(geojson);
 }
 
 async function refreshMapData() {
   updateFilterSummary();
-  const days = daysSelect.value;
-  const mode = modeSelect.value;
-  const response = await fetch(`/api/regions/summary?days=${days}&mode=${mode}`);
+  const queryParams = analyticsQueryParams();
+  const response = await fetch(`/api/regions/summary?${queryParams}`);
   state.summaries = await response.json();
   state.summariesByRegionId = new Map(
     state.summaries.map((item) => [String(item.region_id || "").trim(), item]),
   );
+  if (isDistrictMode()) {
+    const raionsResponse = await fetch(`/api/raions/summary?${queryParams}`);
+    state.raionSummaries = await raionsResponse.json();
+    state.raionSummariesByLocationUid = new Map(
+      state.raionSummaries.map((item) => [String(item.location_uid || "").trim(), item]),
+    );
+  } else {
+    state.raionSummaries = [];
+    state.raionSummariesByLocationUid = new Map();
+  }
   if (state.selectedRegionId) {
     const selectedSummary = summaryByRegionId(state.selectedRegionId);
     if (selectedSummary) {
@@ -330,8 +501,7 @@ function renderDetails(summary) {
 }
 
 async function loadDaily(regionId) {
-  const days = daysSelect.value;
-  const response = await fetch(`/api/regions/${regionId}/daily?days=${days}`);
+  const response = await fetch(`/api/regions/${regionId}/daily?${dailyQueryParams()}`);
   const payload = await response.json();
   renderDailyChart(payload.stats);
 }

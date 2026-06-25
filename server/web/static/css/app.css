@@ -9,6 +9,7 @@
   --map-panel: #f4f6fa;
   --muted: #65758d;
   --region-base: #aeb9c9;
+  --region-no-data: #8f98a8;
   --region-label: #172033;
   --region-label-stroke: rgba(247, 249, 252, 0.86);
   --region-stroke: #eef2f7;
@@ -27,6 +28,7 @@
   --map-panel: #172232;
   --muted: #9aa7b9;
   --region-base: #263244;
+  --region-no-data: #303a49;
   --region-label: #f7f9fc;
   --region-label-stroke: rgba(10, 15, 24, 0.82);
   --region-stroke: #516174;
@@ -65,11 +67,11 @@ body {
 
 .toolbar {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  min-height: 88px;
-  padding: 16px 24px;
+  min-height: 64px;
+  padding: 10px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -147,16 +149,27 @@ select {
   padding: 8px 10px;
 }
 
+input[type="date"] {
+  min-width: 0;
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  background: var(--control-bg);
+  color: var(--text);
+  padding: 8px 10px;
+}
+
 .action-button {
+  --button-accent: #c91d2e;
+  --button-accent-2: #7f1521;
   min-height: 40px;
   min-width: 104px;
-  border: 1px solid color-mix(in srgb, var(--control-border), var(--text) 18%);
+  border: 1px solid var(--button-accent);
   border-radius: 2px;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--control-bg), var(--map-bg) 36%), var(--control-bg)),
-    var(--control-bg);
+    linear-gradient(135deg, color-mix(in srgb, var(--button-accent), var(--surface) 28%), var(--button-accent-2)),
+    var(--button-accent);
   clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
-  color: var(--text);
+  color: #ffffff;
   cursor: pointer;
   font: inherit;
   font-size: 13px;
@@ -172,13 +185,28 @@ select {
 .action-button:hover,
 .action-button:focus-visible,
 .action-button[aria-expanded="true"] {
-  border-color: #c91d2e;
-  filter: brightness(1.06);
+  border-color: color-mix(in srgb, var(--button-accent), #ffffff 45%);
+  filter: brightness(1.12);
   outline: none;
 }
 
 .action-button:active {
   transform: translateY(1px);
+}
+
+#help-toggle {
+  --button-accent: #2f6f9f;
+  --button-accent-2: #174466;
+}
+
+#theme-toggle {
+  --button-accent: #7a4ac7;
+  --button-accent-2: #4b2a83;
+}
+
+#filters-toggle {
+  --button-accent: #c91d2e;
+  --button-accent-2: #7f1521;
 }
 
 .filter-summary {
@@ -235,6 +263,24 @@ select {
   width: 100%;
 }
 
+.date-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.toggle-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle-field input {
+  width: 18px;
+  height: 18px;
+  accent-color: #c91d2e;
+}
+
 #map {
   display: grid;
   place-items: center;
@@ -284,6 +330,23 @@ select {
   filter: drop-shadow(0 0 8px rgba(201, 29, 46, 0.42));
   stroke: var(--selected-stroke);
   stroke-width: 1.4;
+}
+
+.region.district {
+  stroke-width: 0.38;
+}
+
+.region.district:hover,
+.region.district:focus-visible {
+  stroke-width: 0.9;
+}
+
+.region.district.is-selected {
+  stroke-width: 1;
+}
+
+.region.district.is-no-data {
+  filter: none;
 }
 
 .map-labels {
@@ -378,10 +441,11 @@ select {
   height: 36px;
   flex: 0 0 auto;
   place-items: center;
-  border: 1px solid var(--control-border);
-  border-radius: 999px;
-  background: var(--control-bg);
-  color: var(--text);
+  border: 1px solid #c91d2e;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #c91d2e, #7f1521);
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+  color: #ffffff;
   cursor: pointer;
   font-size: 26px;
   line-height: 1;
@@ -389,7 +453,8 @@ select {
 
 #details-close:hover,
 #details-close:focus-visible {
-  border-color: var(--selected-stroke);
+  filter: brightness(1.12);
+  outline: none;
 }
 
 .details .metrics,
@@ -515,9 +580,9 @@ dd {
   .toolbar {
     align-items: stretch;
     flex-direction: column;
-    gap: 12px;
-    min-height: 176px;
-    padding: 14px 16px;
+    gap: 10px;
+    min-height: 118px;
+    padding: 10px 16px;
   }
 
   .toolbar-actions {
@@ -555,6 +620,10 @@ dd {
 
   .filter-panel {
     width: min(420px, calc(100vw - 32px));
+  }
+
+  .date-fields {
+    grid-template-columns: 1fr;
   }
 
   #map {
@@ -614,10 +683,6 @@ dd {
 @media (max-width: 560px) {
   h1 {
     font-size: 19px;
-  }
-
-  .toolbar p {
-    font-size: 13px;
   }
 
   select {

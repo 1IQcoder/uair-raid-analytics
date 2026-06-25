@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_PATH = PROJECT_ROOT / "server" / "web" / "static" / "geo" / "ukr_admin1.geojson"
-OUTPUT_PATH = PROJECT_ROOT / "server" / "web" / "static" / "geo" / "ukraine_regions.geojson"
+GEO_DIR = PROJECT_ROOT / "server" / "web" / "static" / "geo"
+REGION_SOURCE_PATH = GEO_DIR / "ukr_admin1.geojson"
+REGION_OUTPUT_PATH = GEO_DIR / "ukraine_regions.geojson"
+DISTRICT_SOURCE_PATH = GEO_DIR / "ukr_admin2.geojson"
+DISTRICT_OUTPUT_PATH = GEO_DIR / "ukraine_districts.geojson"
+ALERTSUA_RAIONS_PATH = PROJECT_ROOT / "data" / "reference" / "alertsua_raions.csv"
 
 PCODE_TO_REGION = {
     "UA01": ("29", "Автономна Республіка Крим"),
@@ -70,6 +75,32 @@ ISO_TO_REGION = {
 }
 
 
+def normalize_raion_title(value: str) -> str:
+    text = str(value).casefold().strip()
+    suffix = " \u0440\u0430\u0439\u043e\u043d"
+    if text.endswith(suffix):
+        text = text[: -len(suffix)]
+    return text.strip()
+
+
+def load_alertsua_raion_uid_map() -> dict[tuple[str, str], str]:
+    if not ALERTSUA_RAIONS_PATH.exists():
+        return {}
+    mapping: dict[tuple[str, str], str] = {}
+    with ALERTSUA_RAIONS_PATH.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            enabled = str(row.get("enabled", "")).strip().casefold() == "true"
+            if not enabled:
+                continue
+            key = (
+                str(row.get("oblast_uid", "")).strip(),
+                normalize_raion_title(str(row.get("location_title", ""))),
+            )
+            mapping[key] = str(row.get("location_uid", "")).strip()
+    return mapping
+
+
 def load_geojson(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8-sig") as file:
         return json.load(file)
@@ -77,6 +108,7 @@ def load_geojson(path: Path) -> dict[str, Any]:
 
 def normalize_properties(geojson: dict[str, Any]) -> None:
     missing: list[str] = []
+    alertsua_raion_uids = load_alertsua_raion_uid_map()
     for feature in geojson.get("features", []):
         properties = feature.setdefault("properties", {})
         region_code = properties.get("adm1_pcode") or properties.get("shapeISO")
@@ -86,6 +118,18 @@ def normalize_properties(geojson: dict[str, Any]) -> None:
             continue
         properties["region_id"] = region[0]
         properties["region_name"] = region[1]
+        if properties.get("adm2_pcode"):
+            properties["district_id"] = properties["adm2_pcode"]
+            properties["district_name"] = (
+                properties.get("adm2_name1")
+                or properties.get("adm2_name")
+                or properties["adm2_pcode"]
+            )
+            alertsua_uid = alertsua_raion_uids.get(
+                (properties["region_id"], normalize_raion_title(properties["district_name"]))
+            )
+            if alertsua_uid:
+                properties["alertsua_location_uid"] = alertsua_uid
 
     if missing:
         raise ValueError(f"Missing region code mappings: {', '.join(sorted(set(missing)))}")
@@ -159,20 +203,25 @@ def validate_geojson(geojson: dict[str, Any]) -> tuple[int, int | None]:
     return len(features), invalid
 
 
-def main() -> None:
-    geojson = load_geojson(SOURCE_PATH)
+def normalize_file(source_path: Path, output_path: Path) -> None:
+    geojson = load_geojson(source_path)
     normalize_properties(geojson)
     rewind_geojson_for_d3(geojson)
     feature_count, invalid_count = validate_geojson(geojson)
 
-    with OUTPUT_PATH.open("w", encoding="utf-8") as file:
+    with output_path.open("w", encoding="utf-8") as file:
         json.dump(geojson, file, ensure_ascii=False, separators=(",", ":"))
         file.write("\n")
 
     validation = "shapely unavailable"
     if invalid_count is not None:
         validation = f"{invalid_count} invalid geometries"
-    print(f"Normalized {feature_count} features to {OUTPUT_PATH}. Geometry validation: {validation}.")
+    print(f"Normalized {feature_count} features to {output_path}. Geometry validation: {validation}.")
+
+
+def main() -> None:
+    normalize_file(REGION_SOURCE_PATH, REGION_OUTPUT_PATH)
+    normalize_file(DISTRICT_SOURCE_PATH, DISTRICT_OUTPUT_PATH)
 
 
 if __name__ == "__main__":

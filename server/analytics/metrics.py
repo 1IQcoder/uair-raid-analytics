@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -21,13 +21,30 @@ def latest_event_timestamp(session: Session) -> datetime | None:
     )
 
 
-def analysis_window(session: Session, days: int) -> tuple[datetime | None, datetime | None]:
+def analysis_window(
+    session: Session,
+    days: int,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> tuple[datetime | None, datetime | None]:
+    if start_date and end_date:
+        if end_date < start_date:
+            start_date, end_date = end_date, start_date
+        return (
+            datetime.combine(start_date, datetime.min.time()),
+            datetime.combine(end_date + timedelta(days=1), datetime.min.time()),
+        )
+
     end = latest_event_timestamp(session)
     if not end:
         return None, None
     if end.tzinfo is not None:
         end = end.astimezone().replace(tzinfo=None)
     return end - timedelta(days=days), end
+
+
+def _window_day_count(start: datetime, end: datetime) -> int:
+    return max((end.date() - start.date()).days, 1)
 
 
 def _clamped_interval(
@@ -85,11 +102,17 @@ def _events_in_window(session: Session, start: datetime, end: datetime) -> list[
     return list(session.scalars(stmt))
 
 
-def region_summary(session: Session, days: int = 7, mode: str = "combined") -> list[dict]:
+def region_summary(
+    session: Session,
+    days: int = 7,
+    mode: str = "combined",
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[dict]:
     if mode not in VALID_MODES:
         raise ValueError(f"Unsupported mode: {mode}")
 
-    start, end = analysis_window(session, days)
+    start, end = analysis_window(session, days, start_date, end_date)
     if start is None or end is None:
         return _empty_region_summary()
 
@@ -152,11 +175,19 @@ def region_summary(session: Session, days: int = 7, mode: str = "combined") -> l
     return sorted(buckets.values(), key=lambda item: item["region_name"])
 
 
-def daily_region_stats(session: Session, region_id: str, days: int = 7) -> dict:
-    start, end = analysis_window(session, days)
+def daily_region_stats(
+    session: Session,
+    region_id: str,
+    days: int = 7,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> dict:
+    start, end = analysis_window(session, days, start_date, end_date)
     region_name = REGION_BY_ID.get(region_id, {}).get("region_name", region_id)
+    window_days = days
     if start is None or end is None:
-        return {"region_id": region_id, "region_name": region_name, "days": days, "stats": []}
+        return {"region_id": region_id, "region_name": region_name, "days": window_days, "stats": []}
+    window_days = _window_day_count(start, end)
 
     stmt = (
         select(AlertEvent)
@@ -167,7 +198,7 @@ def daily_region_stats(session: Session, region_id: str, days: int = 7) -> dict:
     )
     events = list(session.scalars(stmt))
     stats = []
-    for offset in range(days):
+    for offset in range(window_days):
         day = start.date() + timedelta(days=offset)
         day_start = datetime.combine(day, datetime.min.time())
         day_end = day_start + timedelta(days=1)
@@ -192,7 +223,7 @@ def daily_region_stats(session: Session, region_id: str, days: int = 7) -> dict:
                 "total_duration_minutes": _interval_minutes(merged_intervals),
             }
         )
-    return {"region_id": region_id, "region_name": region_name, "days": days, "stats": stats}
+    return {"region_id": region_id, "region_name": region_name, "days": window_days, "stats": stats}
 
 
 def dataset_meta(session: Session) -> dict:

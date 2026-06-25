@@ -23,7 +23,6 @@
                 <path d="M32 8v5M14 16l4 4M50 16l-4 4" />
               </svg>
             </div>
-            <p>Historical air raid alert statistics by Ukrainian region.</p>
           </div>
           <div class="toolbar-actions">
             <span id="filter-summary" class="filter-summary" aria-live="polite"></span>
@@ -42,6 +41,7 @@
                 <p><strong>Duration</strong> показує сумарні години, коли область була під тривогою.</p>
                 <p><strong>Combined</strong> змішує нормалізовані Count і Duration в один коефіцієнт від 0 до 1.</p>
                 <p>Якщо тривога активна хоча б в одному районі області, область вважається під тривогою.</p>
+                <p><strong>Districts</strong> показує районні межі, але до появи районного датасету колір і клік беруть статистику parent-області.</p>
               </div>
             </div>
             <button class="action-button" id="theme-toggle" type="button">Темна</button>
@@ -56,6 +56,27 @@
                 Фільтри
               </button>
               <div class="popover-panel filter-panel" id="filters-panel" hidden>
+                <label>
+                  Map level
+                  <select id="map-level">
+                    <option value="regions" selected>Regions</option>
+                    <option value="districts">Districts</option>
+                  </select>
+                </label>
+                <label class="toggle-field">
+                  <input id="show-labels" type="checkbox" checked />
+                  Show oblast names
+                </label>
+                <div class="date-fields">
+                  <label>
+                    Start date
+                    <input id="start-date" type="date" />
+                  </label>
+                  <label>
+                    End date
+                    <input id="end-date" type="date" />
+                  </label>
+                </div>
                 <label>
                   Period
                   <select id="days">

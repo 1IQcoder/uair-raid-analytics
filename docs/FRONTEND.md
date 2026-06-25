@@ -13,19 +13,28 @@ This keeps the first implementation easy to inspect and avoids adding a frontend
 
 ## Required Map Asset
 
-The app reads normalized Ukraine regions GeoJSON here:
+The app reads normalized Ukraine GeoJSON here:
 
 ```text
 server/web/static/geo/ukraine_regions.geojson
+server/web/static/geo/ukraine_districts.geojson
 ```
 
-Generate this stable file from the full-resolution `ukr_admin1.geojson` source:
+Generate these stable files from the full-resolution `ukr_admin1.geojson` and `ukr_admin2.geojson` sources:
 
 ```text
 python scripts/normalize_geojson.py
 ```
 
-The JavaScript matches GeoJSON features to API summaries by `region_id`.
+The JavaScript matches oblast GeoJSON features to API summaries by `region_id`.
+
+District mode renders ADM2 geometry. Normalized district features keep:
+
+- `district_id`: ADM2 pcode from the map source.
+- `alertsua_location_uid`: alerts.in.ua raion UID matched from `data/reference/alertsua_raions.csv`.
+- `region_id`: parent oblast UID for click/details fallback.
+
+District fill and tooltip use `alertsua_location_uid` when cached raion data exists. If the selected period has no cached raion events, the district is gray and the tooltip says `Немає даних за цей період`.
 
 ## User Flow
 
@@ -33,6 +42,9 @@ The JavaScript matches GeoJSON features to API summaries by `region_id`.
 2. App requests `/api/regions/summary`.
 3. Map regions are colored by selected metric mode.
 4. User switches period or mode.
-5. User clicks a region.
-6. App requests `/api/regions/{region_id}/daily`.
-7. Detail popup updates metrics and the HTML chart.
+5. User can switch map level between regions and districts.
+6. User can show/hide oblast labels.
+7. User can use either a rolling `days` window or explicit `start_date` / `end_date`.
+8. User clicks a region or district.
+9. App requests `/api/regions/{region_id}/daily` for the parent oblast detail popup.
+10. Detail popup updates metrics and the HTML chart.

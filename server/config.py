@@ -28,6 +28,15 @@ class Settings:
         "https://raw.githubusercontent.com/Vadimkin/ukrainian-air-raid-sirens-dataset/main/datasets/volunteer_data_uk.csv",
     )
     alerts_in_ua_token: str | None = os.getenv("ALERTS_IN_UA_TOKEN") or None
+    alerts_in_ua_history_min_interval_seconds: int = int(
+        os.getenv("ALERTS_IN_UA_HISTORY_MIN_INTERVAL_SECONDS", "35")
+    )
+    alerts_in_ua_history_daily_limit: int = int(
+        os.getenv("ALERTS_IN_UA_HISTORY_DAILY_LIMIT", "500")
+    )
+    alerts_in_ua_worker_enabled: bool = (
+        os.getenv("ALERTS_IN_UA_WORKER_ENABLED", "false").lower() == "true"
+    )
 
     @property
     def resolved_database_url(self) -> str:
