@@ -17,19 +17,38 @@ const mapEl = document.querySelector("#map");
 const mapSvg = document.querySelector("#ukraine-map");
 const daysSelect = document.querySelector("#days");
 const modeSelect = document.querySelector("#mode");
-const themeSelect = document.querySelector("#theme");
-const statusEl = document.querySelector("#map-status");
+const themeToggle = document.querySelector("#theme-toggle");
+const helpToggle = document.querySelector("#help-toggle");
+const filtersToggle = document.querySelector("#filters-toggle");
+const helpPanel = document.querySelector("#help-panel");
+const filtersPanel = document.querySelector("#filters-panel");
+const filterSummaryEl = document.querySelector("#filter-summary");
+const tooltipEl = document.querySelector("#map-tooltip");
 const detailsPanel = document.querySelector("#region-details");
 const closeDetailsButton = document.querySelector("#details-close");
 const dailyChartEl = document.querySelector("#daily-chart");
 
 daysSelect.addEventListener("change", refreshMapData);
 modeSelect.addEventListener("change", refreshMapData);
-themeSelect.addEventListener("change", () => applyTheme(themeSelect.value));
+themeToggle.addEventListener("click", toggleTheme);
+helpToggle.addEventListener("click", (event) => {
+  event.stopPropagation();
+  togglePopover(helpPanel, helpToggle);
+});
+filtersToggle.addEventListener("click", (event) => {
+  event.stopPropagation();
+  togglePopover(filtersPanel, filtersToggle);
+});
+helpPanel.addEventListener("click", (event) => event.stopPropagation());
+filtersPanel.addEventListener("click", (event) => event.stopPropagation());
 closeDetailsButton.addEventListener("click", closeDetails);
+document.addEventListener("click", closePopovers);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && state.selectedRegionId) {
     closeDetails();
+  }
+  if (event.key === "Escape") {
+    closePopovers();
   }
 });
 
@@ -57,11 +76,83 @@ function summaryByFeature(properties) {
   return summaryByRegionId(properties.region_id);
 }
 
+function currentModeLabel() {
+  const mode = modeSelect.value;
+  if (mode === "count") return "Alerts";
+  if (mode === "duration") return "Hours";
+  return "Coefficient";
+}
+
+function metricTooltipValue(summary) {
+  if (!summary) return "-";
+  if (modeSelect.value === "count") return String(summary.alert_count);
+  if (modeSelect.value === "duration") return minutesLabel(summary.total_duration_minutes);
+  return Number(summary.metric_value || 0).toFixed(2);
+}
+
+function tooltipText(properties) {
+  const summary = summaryByFeature(properties);
+  return `${regionName(properties)} (${currentModeLabel()}: ${metricTooltipValue(summary)})`;
+}
+
+function showTooltip(event, properties) {
+  tooltipEl.textContent = tooltipText(properties);
+  tooltipEl.classList.add("is-visible");
+  tooltipEl.setAttribute("aria-hidden", "false");
+  if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+    moveTooltip(event);
+    return;
+  }
+  const bounds = event.currentTarget.getBoundingClientRect();
+  tooltipEl.style.left = `${bounds.left + bounds.width / 2}px`;
+  tooltipEl.style.top = `${bounds.top + bounds.height / 2}px`;
+}
+
+function moveTooltip(event) {
+  const offset = 14;
+  tooltipEl.style.left = `${event.clientX + offset}px`;
+  tooltipEl.style.top = `${event.clientY + offset}px`;
+}
+
+function hideTooltip() {
+  tooltipEl.classList.remove("is-visible");
+  tooltipEl.setAttribute("aria-hidden", "true");
+}
+
 function applyTheme(theme) {
   const normalizedTheme = theme === "dark" ? "dark" : "light";
   document.documentElement.dataset.theme = normalizedTheme;
-  themeSelect.value = normalizedTheme;
+  themeToggle.textContent = normalizedTheme === "dark" ? "Світла" : "Темна";
+  themeToggle.setAttribute(
+    "aria-label",
+    normalizedTheme === "dark" ? "Увімкнути світлу тему" : "Увімкнути темну тему",
+  );
   localStorage.setItem("uair-theme", normalizedTheme);
+}
+
+function toggleTheme() {
+  const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  applyTheme(nextTheme);
+}
+
+function togglePopover(panel, button) {
+  const willOpen = panel.hidden;
+  closePopovers();
+  panel.hidden = !willOpen;
+  button.setAttribute("aria-expanded", String(willOpen));
+}
+
+function closePopovers() {
+  helpPanel.hidden = true;
+  filtersPanel.hidden = true;
+  helpToggle.setAttribute("aria-expanded", "false");
+  filtersToggle.setAttribute("aria-expanded", "false");
+}
+
+function updateFilterSummary() {
+  const daysLabel = daysSelect.selectedOptions[0]?.textContent || `${daysSelect.value} days`;
+  const modeLabel = modeSelect.selectedOptions[0]?.textContent || modeSelect.value;
+  filterSummaryEl.textContent = `${daysLabel} · ${modeLabel}`;
 }
 
 function shortenRegionLabel(name) {
@@ -143,6 +234,11 @@ function renderGeoJsonMap(geojson) {
       "aria-label": regionName(properties),
     });
     path.addEventListener("click", () => selectRegion(summaryByFeature(properties)));
+    path.addEventListener("mouseenter", (event) => showTooltip(event, properties));
+    path.addEventListener("mousemove", moveTooltip);
+    path.addEventListener("mouseleave", hideTooltip);
+    path.addEventListener("focus", (event) => showTooltip(event, properties));
+    path.addEventListener("blur", hideTooltip);
     path.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
@@ -193,12 +289,12 @@ async function loadGeoJson() {
     state.geojson = await response.json();
     renderGeoJsonMap(state.geojson);
   } catch (error) {
-    statusEl.textContent =
-      "Map geometry is not available. Check /static/geo/ukraine_regions.geojson.";
+    console.error("Map geometry is not available. Check /static/geo/ukraine_regions.geojson.", error);
   }
 }
 
 async function refreshMapData() {
+  updateFilterSummary();
   const days = daysSelect.value;
   const mode = modeSelect.value;
   const response = await fetch(`/api/regions/summary?days=${days}&mode=${mode}`);
@@ -214,9 +310,6 @@ async function refreshMapData() {
     }
   }
   updateMapColors();
-  statusEl.textContent = state.summaries.length
-    ? `Loaded ${state.summaries.length} regional summaries.`
-    : "No dataset loaded yet. Run the update script first.";
 }
 
 function minutesLabel(value) {

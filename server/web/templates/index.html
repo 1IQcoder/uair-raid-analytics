@@ -1,43 +1,79 @@
 <!doctype html>
-<html lang="en">
+<html lang="uk">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ app_name }}</title>
+    <link
+      rel="icon"
+      href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%230d121a"/><path d="M18 42h28l-4-18c-1-5-5-8-10-8s-9 3-10 8l-4 18Z" fill="%23c91d2e"/><path d="M15 47h34" stroke="%23f7f9fc" stroke-width="6" stroke-linecap="round"/><path d="M32 8v5M14 16l4 4M50 16l-4 4" stroke="%23f7f9fc" stroke-width="4" stroke-linecap="round"/></svg>'
+    />
     <link rel="stylesheet" href="/static/css/app.css" />
   </head>
   <body>
     <main class="layout">
       <section class="map-panel">
         <header class="toolbar">
-          <div>
-            <h1>UAir-raid-analytics</h1>
+          <div class="brand">
+            <div class="title-row">
+              <h1>UAir-raid-analytics</h1>
+              <svg class="title-icon" viewBox="0 0 64 64" aria-hidden="true">
+                <path d="M18 42h28l-4-18c-1-5-5-8-10-8s-9 3-10 8l-4 18Z" />
+                <path d="M15 47h34" />
+                <path d="M32 8v5M14 16l4 4M50 16l-4 4" />
+              </svg>
+            </div>
             <p>Historical air raid alert statistics by Ukrainian region.</p>
           </div>
-          <div class="controls" aria-label="Map filters">
-            <label>
-              Period
-              <select id="days">
-                <option value="7" selected>7 days</option>
-                <option value="14">14 days</option>
-                <option value="30">30 days</option>
-              </select>
-            </label>
-            <label>
-              Mode
-              <select id="mode">
-                <option value="combined" selected>Combined</option>
-                <option value="count">Count</option>
-                <option value="duration">Duration</option>
-              </select>
-            </label>
-            <label>
-              Theme
-              <select id="theme">
-                <option value="light" selected>Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </label>
+          <div class="toolbar-actions">
+            <span id="filter-summary" class="filter-summary" aria-live="polite"></span>
+            <div class="popover" id="help-popover">
+              <button
+                class="action-button"
+                id="help-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="help-panel"
+              >
+                Довідка
+              </button>
+              <div class="popover-panel help-content" id="help-panel" hidden>
+                <p><strong>Count</strong> показує кількість суцільних періодів тривоги за обраний період.</p>
+                <p><strong>Duration</strong> показує сумарні години, коли область була під тривогою.</p>
+                <p><strong>Combined</strong> змішує нормалізовані Count і Duration в один коефіцієнт від 0 до 1.</p>
+                <p>Якщо тривога активна хоча б в одному районі області, область вважається під тривогою.</p>
+              </div>
+            </div>
+            <button class="action-button" id="theme-toggle" type="button">Темна</button>
+            <div class="popover" id="filters-popover">
+              <button
+                class="action-button"
+                id="filters-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="filters-panel"
+              >
+                Фільтри
+              </button>
+              <div class="popover-panel filter-panel" id="filters-panel" hidden>
+                <label>
+                  Period
+                  <select id="days">
+                    <option value="7" selected>7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30">30 days</option>
+                  </select>
+                </label>
+                <label>
+                  Mode
+                  <select id="mode">
+                    <option value="combined" selected>Combined</option>
+                    <option value="count">Count</option>
+                    <option value="duration">Duration</option>
+                  </select>
+                </label>
+              </div>
+            </div>
           </div>
         </header>
         <div id="map" aria-label="Ukraine alert statistics map">
@@ -48,8 +84,8 @@
             preserveAspectRatio="xMidYMid meet"
           ></svg>
         </div>
-        <p id="map-status" class="status"></p>
       </section>
+      <div id="map-tooltip" class="map-tooltip" role="status" aria-hidden="true"></div>
 
       <aside class="details" id="region-details" aria-hidden="true" aria-live="polite">
         <div class="details-header">

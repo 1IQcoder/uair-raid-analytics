@@ -74,6 +74,34 @@ body {
   background: var(--surface);
 }
 
+.brand {
+  min-width: 220px;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+}
+
+.title-icon path:first-child {
+  fill: #c91d2e;
+  stroke: none;
+}
+
+.title-icon path:not(:first-child) {
+  fill: none;
+  stroke: var(--text);
+  stroke-linecap: round;
+  stroke-width: 5;
+}
+
 h1,
 h2,
 p {
@@ -90,9 +118,17 @@ h1 {
   color: var(--muted);
 }
 
-.controls {
+.toolbar-actions {
   display: flex;
-  gap: 12px;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.popover {
+  position: relative;
+  display: flex;
 }
 
 label {
@@ -109,6 +145,94 @@ select {
   background: var(--control-bg);
   color: var(--text);
   padding: 8px 10px;
+}
+
+.action-button {
+  min-height: 40px;
+  min-width: 104px;
+  border: 1px solid color-mix(in srgb, var(--control-border), var(--text) 18%);
+  border-radius: 2px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--control-bg), var(--map-bg) 36%), var(--control-bg)),
+    var(--control-bg);
+  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  padding: 9px 16px;
+  text-transform: uppercase;
+  transition:
+    border-color 160ms ease,
+    filter 160ms ease,
+    transform 160ms ease;
+}
+
+.action-button:hover,
+.action-button:focus-visible,
+.action-button[aria-expanded="true"] {
+  border-color: #c91d2e;
+  filter: brightness(1.06);
+  outline: none;
+}
+
+.action-button:active {
+  transform: translateY(1px);
+}
+
+.filter-summary {
+  display: none;
+  max-width: min(44vw, 260px);
+  align-self: center;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popover-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 30;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.24);
+}
+
+.popover-panel[hidden] {
+  display: none;
+}
+
+.help-content {
+  display: grid;
+  width: min(380px, calc(100vw - 32px));
+  gap: 10px;
+  padding: 14px;
+}
+
+.help-content p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.help-content strong {
+  color: var(--text);
+}
+
+.filter-panel {
+  display: grid;
+  width: 292px;
+  gap: 14px;
+  padding: 14px;
+}
+
+.filter-panel select {
+  width: 100%;
 }
 
 #map {
@@ -185,12 +309,27 @@ select {
   fill: var(--selected-stroke);
 }
 
-.status {
-  min-height: 36px;
-  padding: 8px 24px;
-  color: var(--muted);
+.map-tooltip {
+  position: fixed;
+  z-index: 40;
+  max-width: min(340px, calc(100vw - 24px));
+  transform: translate(0, 0);
+  border: 1px solid var(--border);
+  border-radius: 6px;
   background: var(--surface);
-  border-top: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.24);
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: 0;
+  padding: 8px 10px;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.map-tooltip.is-visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .details {
@@ -377,12 +516,45 @@ dd {
     align-items: stretch;
     flex-direction: column;
     gap: 12px;
-    min-height: 138px;
+    min-height: 176px;
     padding: 14px 16px;
   }
 
-  .controls {
+  .toolbar-actions {
+    align-items: stretch;
+    justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  #help-popover {
+    order: 1;
+  }
+
+  #theme-toggle {
+    order: 2;
+  }
+
+  .filter-summary {
+    display: block;
+    order: 3;
+    flex: 0 1 auto;
+  }
+
+  #filters-popover {
+    order: 4;
+  }
+
+  .popover-panel {
+    position: fixed;
+    top: 50%;
+    right: auto;
+    left: 50%;
+    width: min(420px, calc(100vw - 32px));
+    transform: translate(-50%, -50%);
+  }
+
+  .filter-panel {
+    width: min(420px, calc(100vw - 32px));
   }
 
   #map {
@@ -450,6 +622,16 @@ dd {
 
   select {
     min-width: 112px;
+  }
+
+  .toolbar-actions {
+    gap: 10px;
+  }
+
+  .action-button {
+    min-width: 92px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .region-label {
